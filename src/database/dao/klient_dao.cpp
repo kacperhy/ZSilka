@@ -5,10 +5,16 @@ KlientDAO::KlientDAO(MenedzerBD& menedzerBD) : menedzerBD(menedzerBD) {
 }
 
 std::vector<Klient> KlientDAO::pobierzWszystkich() {
-    std::string zapytanie = "SELECT id, first_name, last_name, email, phone, birth_date, registration_date, notes FROM clients ORDER BY last_name, first_name";
+    std::vector<Klient> klienci;
+
+    std::string zapytanie = R"(
+        SELECT id, first_name, last_name, email, phone, 
+               birth_date, registration_date, notes
+        FROM clients
+        ORDER BY last_name, first_name
+    )";
 
     auto wyniki = menedzerBD.pobierzDane(zapytanie);
-    std::vector<Klient> klienci;
 
     for (const auto& wiersz : wyniki) {
         klienci.push_back(utworzKlientaZWiersza(wiersz));
@@ -18,74 +24,88 @@ std::vector<Klient> KlientDAO::pobierzWszystkich() {
 }
 
 std::unique_ptr<Klient> KlientDAO::pobierzPoId(int id) {
-    std::string zapytanie = "SELECT id, first_name, last_name, email, phone, birth_date, registration_date, notes FROM clients WHERE id = " + std::to_string(id);
+    std::string zapytanie = R"(
+        SELECT id, first_name, last_name, email, phone, 
+               birth_date, registration_date, notes
+        FROM clients
+        WHERE id = ?
+    )";
 
-    auto wiersz = menedzerBD.pobierzWiersz(zapytanie);
+    std::vector<ParamZapytania> parametry = {{1, std::to_string(id)}};
+    auto wyniki = menedzerBD.pobierzDaneZParametrami(zapytanie, parametry);
 
-    if (wiersz.empty()) {
+    if (wyniki.empty()) {
         return nullptr;
     }
 
-    return std::make_unique<Klient>(utworzKlientaZWiersza(wiersz));
+    return std::make_unique<Klient>(utworzKlientaZWiersza(wyniki[0]));
 }
 
 int KlientDAO::dodaj(const Klient& klient) {
     std::stringstream ss;
-    ss << "INSERT INTO clients (first_name, last_name, email, phone, birth_date, registration_date, notes) VALUES ('"
-        << klient.pobierzImie() << "', '"
-        << klient.pobierzNazwisko() << "', '"
-        << klient.pobierzEmail() << "', '"
-        << klient.pobierzTelefon() << "', '"
-        << klient.pobierzDateUrodzenia() << "', '"
-        << (klient.pobierzDateRejestracji().empty() ? Klient::pobierzAktualnaDate() : klient.pobierzDateRejestracji()) << "', '"
-        << klient.pobierzUwagi() << "')";
+    ss << "INSERT INTO clients (first_name, last_name, email, phone, "
+       << "birth_date, registration_date, notes) VALUES ('"
+       << klient.pobierzImie() << "', '"
+       << klient.pobierzNazwisko() << "', '"
+       << klient.pobierzEmail() << "', '"
+       << klient.pobierzTelefon() << "', '"
+       << klient.pobierzDateUrodzenia() << "', '"
+       << klient.pobierzDateRejestracji() << "', '"
+       << klient.pobierzUwagi() << "')";
 
     return menedzerBD.wykonajZapytanieZwracajaceId(ss.str());
 }
 
 bool KlientDAO::aktualizuj(const Klient& klient) {
-    std::stringstream ss;
-    ss << "UPDATE clients SET "
-        << "first_name = '" << klient.pobierzImie() << "', "
-        << "last_name = '" << klient.pobierzNazwisko() << "', "
-        << "email = '" << klient.pobierzEmail() << "', "
-        << "phone = '" << klient.pobierzTelefon() << "', "
-        << "birth_date = '" << klient.pobierzDateUrodzenia() << "', "
-        << "notes = '" << klient.pobierzUwagi() << "' "
-        << "WHERE id = " << klient.pobierzId();
-
     try {
+        std::stringstream ss;
+        ss << "UPDATE clients SET "
+           << "first_name = '" << klient.pobierzImie() << "', "
+           << "last_name = '" << klient.pobierzNazwisko() << "', "
+           << "email = '" << klient.pobierzEmail() << "', "
+           << "phone = '" << klient.pobierzTelefon() << "', "
+           << "birth_date = '" << klient.pobierzDateUrodzenia() << "', "
+           << "registration_date = '" << klient.pobierzDateRejestracji() << "', "
+           << "notes = '" << klient.pobierzUwagi() << "' "
+           << "WHERE id = " << klient.pobierzId();
+
         menedzerBD.wykonajZapytanie(ss.str());
         return true;
-    }
-    catch (const std::exception&) {
+    } catch (const std::exception&) {
         return false;
     }
 }
 
 bool KlientDAO::usun(int id) {
-    std::string zapytanie = "DELETE FROM clients WHERE id = " + std::to_string(id);
-
     try {
+        std::string zapytanie = "DELETE FROM clients WHERE id = " + std::to_string(id);
         menedzerBD.wykonajZapytanie(zapytanie);
         return true;
-    }
-    catch (const std::exception&) {
+    } catch (const std::exception&) {
         return false;
     }
 }
 
 std::vector<Klient> KlientDAO::wyszukaj(const std::string& klucz) {
-    std::stringstream ss;
-    ss << "SELECT id, first_name, last_name, email, phone, birth_date, registration_date, notes FROM clients WHERE "
-        << "first_name LIKE '%" << klucz << "%' OR "
-        << "last_name LIKE '%" << klucz << "%' OR "
-        << "email LIKE '%" << klucz << "%' OR "
-        << "phone LIKE '%" << klucz << "%' "
-        << "ORDER BY last_name, first_name";
-
-    auto wyniki = menedzerBD.pobierzDane(ss.str());
     std::vector<Klient> klienci;
+
+    std::string zapytanie = R"(
+        SELECT id, first_name, last_name, email, phone, 
+               birth_date, registration_date, notes
+        FROM clients
+        WHERE first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ?
+        ORDER BY last_name, first_name
+    )";
+
+    std::string wzorzec = "%" + klucz + "%";
+    std::vector<ParamZapytania> parametry = {
+        {1, wzorzec},
+        {2, wzorzec},
+        {3, wzorzec},
+        {4, wzorzec}
+    };
+
+    auto wyniki = menedzerBD.pobierzDaneZParametrami(zapytanie, parametry);
 
     for (const auto& wiersz : wyniki) {
         klienci.push_back(utworzKlientaZWiersza(wiersz));
@@ -96,17 +116,17 @@ std::vector<Klient> KlientDAO::wyszukaj(const std::string& klucz) {
 
 Klient KlientDAO::utworzKlientaZWiersza(const WierszBD& wiersz) {
     if (wiersz.size() < 8) {
-        throw std::runtime_error("Nieprawid³owy wiersz danych klienta");
+        throw WyjatekBazyDanych("NieprawidÅ‚owa liczba kolumn w wierszu klienta");
     }
 
-    return Klient(
-        std::stoi(wiersz[0]),  // id
-        wiersz[1],             // first_name
-        wiersz[2],             // last_name
-        wiersz[3],             // email
-        wiersz[4],             // phone
-        wiersz[5],             // birth_date
-        wiersz[6],             // registration_date
-        wiersz[7]              // notes
-    );
+    int id = std::stoi(wiersz[0]);
+    std::string imie = wiersz[1];
+    std::string nazwisko = wiersz[2];
+    std::string email = wiersz[3];
+    std::string telefon = wiersz[4];
+    std::string dataUrodzenia = wiersz[5];
+    std::string dataRejestracji = wiersz[6];
+    std::string uwagi = wiersz[7];
+
+    return Klient(id, imie, nazwisko, email, telefon, dataUrodzenia, dataRejestracji, uwagi);
 }

@@ -1,9 +1,10 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "karnet.h"
-#include <sstream>
+#include <chrono>
+#include <algorithm>
 
-Karnet::Karnet() : id(-1), idKlienta(-1), typ(""), dataRozpoczecia(""),
-dataZakonczenia(""), cena(0.0), czyAktywny(false) {
+Karnet::Karnet() : id(-1), idKlienta(-1), typ(""), dataRozpoczecia(""), 
+    dataZakonczenia(""), cena(0.0), czyAktywny(false) {
 }
 
 Karnet::Karnet(int id, int idKlienta, const std::string& typ,
@@ -13,6 +14,7 @@ Karnet::Karnet(int id, int idKlienta, const std::string& typ,
     dataZakonczenia(dataZakonczenia), cena(cena), czyAktywny(czyAktywny) {
 }
 
+// Gettery
 int Karnet::pobierzId() const {
     return id;
 }
@@ -41,6 +43,7 @@ bool Karnet::pobierzCzyAktywny() const {
     return czyAktywny;
 }
 
+// Settery
 void Karnet::ustawId(int id) {
     this->id = id;
 }
@@ -69,16 +72,28 @@ void Karnet::ustawCzyAktywny(bool czyAktywny) {
     this->czyAktywny = czyAktywny;
 }
 
+// Metody biznesowe
 bool Karnet::czyWazny() const {
+    if (!czyAktywny) {
+        return false;
+    }
+    
     std::string dzisiaj = pobierzAktualnaDate();
-    return dzisiaj >= dataRozpoczecia && dzisiaj <= dataZakonczenia && czyAktywny;
+    
+    // SprawdÅº czy dzisiaj jest miÄ™dzy datÄ… rozpoczÄ™cia a zakoÅ„czenia
+    return (dzisiaj >= dataRozpoczecia && dzisiaj <= dataZakonczenia);
 }
 
 int Karnet::ileDniPozostalo() const {
+    if (!czyAktywny) {
+        return 0;
+    }
+    
     std::string dzisiaj = pobierzAktualnaDate();
     return dniPomiedzy(dzisiaj, dataZakonczenia);
 }
 
+// Metody statyczne
 std::string Karnet::pobierzAktualnaDate() {
     auto t = std::time(nullptr);
     auto tm = *std::localtime(&t);
@@ -89,40 +104,35 @@ std::string Karnet::pobierzAktualnaDate() {
 
 std::string Karnet::dodajDniDoData(const std::string& data, int dni) {
     std::tm tm = konwertujStringNaDate(data);
-
+    
     // Dodaj dni
-    tm.tm_mday += dni;
-
-    // Normalizuj datê
-    std::mktime(&tm);
-
+    auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    tp += std::chrono::hours(24 * dni);
+    auto time = std::chrono::system_clock::to_time_t(tp);
+    auto newTm = *std::localtime(&time);
+    
     std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d");
+    oss << std::put_time(&newTm, "%Y-%m-%d");
     return oss.str();
 }
 
+// Metody prywatne
 std::tm Karnet::konwertujStringNaDate(const std::string& tekstDaty) {
     std::tm tm = {};
     std::istringstream ss(tekstDaty);
     ss >> std::get_time(&tm, "%Y-%m-%d");
-
-    if (ss.fail()) {
-        // Jeœli parsowanie siê nie powiod³o, zwróæ dzisiejsz¹ datê
-        auto t = std::time(nullptr);
-        return *std::localtime(&t);
-    }
-
     return tm;
 }
 
 int Karnet::dniPomiedzy(const std::string& data1, const std::string& data2) {
     std::tm tm1 = konwertujStringNaDate(data1);
     std::tm tm2 = konwertujStringNaDate(data2);
-
-    std::time_t time1 = std::mktime(&tm1);
-    std::time_t time2 = std::mktime(&tm2);
-
-    // Oblicz ró¿nicê w sekundach i przekonwertuj na dni
-    double diff = std::difftime(time2, time1);
-    return static_cast<int>(diff / (60 * 60 * 24));
+    
+    auto tp1 = std::chrono::system_clock::from_time_t(std::mktime(&tm1));
+    auto tp2 = std::chrono::system_clock::from_time_t(std::mktime(&tm2));
+    
+    auto duration = tp2 - tp1;
+    auto days = std::chrono::duration_cast<std::chrono::hours>(duration).count() / 24;
+    
+    return static_cast<int>(days);
 }

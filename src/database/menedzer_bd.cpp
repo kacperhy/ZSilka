@@ -1,10 +1,8 @@
 #include "menedzer_bd.h"
 #include <iostream>
+#include <sstream>
 
-MenedzerBD::MenedzerBD(const std::string& sciezkaPliku)
-    : sciezkaPliku(sciezkaPliku), polaczenie(nullptr) {
-    otworz();
-    inicjalizujBazeDanych();
+MenedzerBD::MenedzerBD(const std::string& sciezkaPliku) : sciezkaPliku(sciezkaPliku), polaczenie(nullptr) {
 }
 
 MenedzerBD::~MenedzerBD() {
@@ -12,12 +10,19 @@ MenedzerBD::~MenedzerBD() {
 }
 
 void MenedzerBD::otworz() {
+    if (polaczenie != nullptr) {
+        return; // JuÅ¼ otwarte
+    }
+
     int kod = sqlite3_open(sciezkaPliku.c_str(), &polaczenie);
     sprawdzBlad(kod, "Otwieranie bazy danych");
+
+    // WÅ‚Ä…cz foreign keys
+    wykonajZapytanie("PRAGMA foreign_keys = ON;");
 }
 
 void MenedzerBD::zamknij() {
-    if (polaczenie) {
+    if (polaczenie != nullptr) {
         sqlite3_close(polaczenie);
         polaczenie = nullptr;
     }
@@ -28,13 +33,17 @@ bool MenedzerBD::czyOtwarta() const {
 }
 
 void MenedzerBD::wykonajZapytanie(const std::string& zapytanie) {
-    char* bladWiadomosc = nullptr;
-    int kod = sqlite3_exec(polaczenie, zapytanie.c_str(), nullptr, nullptr, &bladWiadomosc);
+    if (!czyOtwarta()) {
+        throw WyjatekBazyDanych("Baza danych nie jest otwarta");
+    }
+
+    char* errorMsg = nullptr;
+    int kod = sqlite3_exec(polaczenie, zapytanie.c_str(), nullptr, nullptr, &errorMsg);
 
     if (kod != SQLITE_OK) {
-        std::string blad = bladWiadomosc ? bladWiadomosc : "Nieznany b³¹d";
-        sqlite3_free(bladWiadomosc);
-        throw WyjatekBazyDanych("B³¹d wykonywania zapytania: " + blad);
+        std::string error = errorMsg ? errorMsg : "Nieznany bÅ‚Ä…d";
+        sqlite3_free(errorMsg);
+        throw WyjatekBazyDanych("BÅ‚Ä…d wykonania zapytania: " + error);
     }
 }
 
@@ -44,60 +53,40 @@ int MenedzerBD::wykonajZapytanieZwracajaceId(const std::string& zapytanie) {
 }
 
 TabelaBD MenedzerBD::pobierzDane(const std::string& zapytanie) {
-    sqlite3_stmt* stmt;
-    int kod = sqlite3_prepare_v2(polaczenie, zapytanie.c_str(), -1, &stmt, nullptr);
-    sprawdzBlad(kod, "Przygotowywanie zapytania");
-
-    TabelaBD wyniki;
-
-    while ((kod = sqlite3_step(stmt)) == SQLITE_ROW) {
-        WierszBD wiersz;
-        int liczbaKolumn = sqlite3_column_count(stmt);
-
-        for (int i = 0; i < liczbaKolumn; i++) {
-            const char* tekst = reinterpret_cast<const char*>(sqlite3_column_text(stmt, i));
-            wiersz.push_back(tekst ? tekst : "");
-        }
-
-        wyniki.push_back(wiersz);
-    }
-
-    if (kod != SQLITE_DONE) {
-        sqlite3_finalize(stmt);
-        sprawdzBlad(kod, "Wykonywanie zapytania");
-    }
-
-    sqlite3_finalize(stmt);
-    return wyniki;
+    return pobierzDaneZParametrami(zapytanie, {});
 }
 
 WierszBD MenedzerBD::pobierzWiersz(const std::string& zapytanie) {
-    auto wyniki = pobierzDane(zapytanie);
-    return wyniki.empty() ? WierszBD() : wyniki[0];
+    return pobierzWierszZParametrami(zapytanie, {});
 }
 
 std::string MenedzerBD::pobierzWartosc(const std::string& zapytanie) {
-    auto wiersz = pobierzWiersz(zapytanie);
-    return wiersz.empty() ? "" : wiersz[0];
+    return pobierzWartoscZParametrami(zapytanie, {});
 }
 
 TabelaBD MenedzerBD::pobierzDaneZParametrami(const std::string& zapytanie,
     const std::vector<ParamZapytania>& parametry) {
+
+    if (!czyOtwarta()) {
+        throw WyjatekBazyDanych("Baza danych nie jest otwarta");
+    }
+
     sqlite3_stmt* stmt;
     int kod = sqlite3_prepare_v2(polaczenie, zapytanie.c_str(), -1, &stmt, nullptr);
-    sprawdzBlad(kod, "Przygotowywanie zapytania z parametrami");
+    sprawdzBlad(kod, "Przygotowanie zapytania");
 
+    // Binduj parametry
     bindParameters(stmt, parametry);
 
     TabelaBD wyniki;
 
     while ((kod = sqlite3_step(stmt)) == SQLITE_ROW) {
         WierszBD wiersz;
-        int liczbaKolumn = sqlite3_column_count(stmt);
+        int liczbKolumn = sqlite3_column_count(stmt);
 
-        for (int i = 0; i < liczbaKolumn; i++) {
-            const char* tekst = reinterpret_cast<const char*>(sqlite3_column_text(stmt, i));
-            wiersz.push_back(tekst ? tekst : "");
+        for (int i = 0; i < liczbKolumn; i++) {
+            const char* wartosc = reinterpret_cast<const char*>(sqlite3_column_text(stmt, i));
+            wiersz.push_back(wartosc ? wartosc : "");
         }
 
         wyniki.push_back(wiersz);
@@ -105,7 +94,7 @@ TabelaBD MenedzerBD::pobierzDaneZParametrami(const std::string& zapytanie,
 
     if (kod != SQLITE_DONE) {
         sqlite3_finalize(stmt);
-        sprawdzBlad(kod, "Wykonywanie zapytania z parametrami");
+        sprawdzBlad(kod, "Wykonanie zapytania");
     }
 
     sqlite3_finalize(stmt);
@@ -114,18 +103,22 @@ TabelaBD MenedzerBD::pobierzDaneZParametrami(const std::string& zapytanie,
 
 WierszBD MenedzerBD::pobierzWierszZParametrami(const std::string& zapytanie,
     const std::vector<ParamZapytania>& parametry) {
+
     auto wyniki = pobierzDaneZParametrami(zapytanie, parametry);
     return wyniki.empty() ? WierszBD() : wyniki[0];
 }
 
 std::string MenedzerBD::pobierzWartoscZParametrami(const std::string& zapytanie,
     const std::vector<ParamZapytania>& parametry) {
+
     auto wiersz = pobierzWierszZParametrami(zapytanie, parametry);
     return wiersz.empty() ? "" : wiersz[0];
 }
 
 void MenedzerBD::inicjalizujBazeDanych() {
-    // Tworzenie tabeli klientów
+    // Tworzenie tabel
+    
+    // Tabela klientÃ³w
     std::string sqlKlienci = R"(
         CREATE TABLE IF NOT EXISTS clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,12 +127,12 @@ void MenedzerBD::inicjalizujBazeDanych() {
             email TEXT,
             phone TEXT,
             birth_date TEXT,
-            registration_date TEXT DEFAULT (datetime('now', 'localtime')),
+            registration_date TEXT NOT NULL,
             notes TEXT
         )
     )";
 
-    // Tworzenie tabeli karnetów
+    // Tabela karnetÃ³w
     std::string sqlKarnety = R"(
         CREATE TABLE IF NOT EXISTS memberships (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,12 +141,12 @@ void MenedzerBD::inicjalizujBazeDanych() {
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
             price REAL NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            FOREIGN KEY (client_id) REFERENCES clients (id)
+            is_active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
         )
     )";
 
-    // Tworzenie tabeli zajêæ
+    // Tabela zajÄ™Ä‡
     std::string sqlZajecia = R"(
         CREATE TABLE IF NOT EXISTS gym_classes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -167,42 +160,51 @@ void MenedzerBD::inicjalizujBazeDanych() {
         )
     )";
 
-    // Tworzenie tabeli rezerwacji
+    // Tabela rezerwacji
     std::string sqlRezerwacje = R"(
         CREATE TABLE IF NOT EXISTS reservations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER NOT NULL,
             class_id INTEGER NOT NULL,
-            reservation_date TEXT DEFAULT (datetime('now', 'localtime')),
-            status TEXT DEFAULT 'potwierdzona',
-            FOREIGN KEY (client_id) REFERENCES clients (id),
-            FOREIGN KEY (class_id) REFERENCES gym_classes (id)
+            reservation_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'potwierdzona',
+            FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+            FOREIGN KEY (class_id) REFERENCES gym_classes (id) ON DELETE CASCADE
         )
     )";
 
-    try {
-        wykonajZapytanie(sqlKlienci);
-        wykonajZapytanie(sqlKarnety);
-        wykonajZapytanie(sqlZajecia);
-        wykonajZapytanie(sqlRezerwacje);
-    }
-    catch (const std::exception& e) {
-        throw WyjatekBazyDanych("B³¹d inicjalizacji bazy danych: " + std::string(e.what()));
-    }
+    // Wykonaj tworzenie tabel
+    wykonajZapytanie(sqlKlienci);
+    wykonajZapytanie(sqlKarnety);
+    wykonajZapytanie(sqlZajecia);
+    wykonajZapytanie(sqlRezerwacje);
+
+    // Tworzenie indeksÃ³w dla wydajnoÅ›ci
+    wykonajZapytanie("CREATE INDEX IF NOT EXISTS idx_clients_email ON clients(email);");
+    wykonajZapytanie("CREATE INDEX IF NOT EXISTS idx_memberships_client ON memberships(client_id);");
+    wykonajZapytanie("CREATE INDEX IF NOT EXISTS idx_memberships_dates ON memberships(start_date, end_date);");
+    wykonajZapytanie("CREATE INDEX IF NOT EXISTS idx_classes_date ON gym_classes(date);");
+    wykonajZapytanie("CREATE INDEX IF NOT EXISTS idx_reservations_client ON reservations(client_id);");
+    wykonajZapytanie("CREATE INDEX IF NOT EXISTS idx_reservations_class ON reservations(class_id);");
+
+    std::cout << "Baza danych zostaÅ‚a zainicjalizowana pomyÅ›lnie." << std::endl;
 }
 
 void MenedzerBD::sprawdzBlad(int kod, const std::string& operacja) {
     if (kod != SQLITE_OK) {
-        std::string bladWiadomosc = sqlite3_errmsg(polaczenie);
-        throw WyjatekBazyDanych(operacja + ": " + bladWiadomosc);
+        std::string error = sqlite3_errmsg(polaczenie);
+        throw WyjatekBazyDanych(operacja + ": " + error);
     }
 }
 
 void MenedzerBD::bindParameters(sqlite3_stmt* stmt, const std::vector<ParamZapytania>& parametry) {
     for (const auto& param : parametry) {
-        int kod = sqlite3_bind_text(stmt, param.first, param.second.c_str(), -1, SQLITE_STATIC);
+        int indeks = param.first;
+        const std::string& wartosc = param.second;
+
+        int kod = sqlite3_bind_text(stmt, indeks, wartosc.c_str(), -1, SQLITE_STATIC);
         if (kod != SQLITE_OK) {
-            throw WyjatekBazyDanych("B³¹d bindowania parametru: " + std::string(sqlite3_errmsg(polaczenie)));
+            throw WyjatekBazyDanych("BÅ‚Ä…d bindowania parametru " + std::to_string(indeks));
         }
     }
 }
