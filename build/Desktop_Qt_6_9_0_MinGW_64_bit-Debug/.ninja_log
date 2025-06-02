@@ -1,0 +1,9 @@
+# ninja log v5
+10	997	7705884602191926	ZarzadzanieSilownia_autogen/timestamp	ecffc93ac3444441
+10	997	7705884602191926	ZarzadzanieSilownia_autogen/mocs_compilation.cpp	ecffc93ac3444441
+10	997	7705884602191926	C:/Users/Kacper/OneDrive/Dokumenty/ZarzadzanieSilownia/build/Desktop_Qt_6_9_0_MinGW_64_bit-Debug/ZarzadzanieSilownia_autogen/timestamp	ecffc93ac3444441
+10	997	7705884602191926	C:/Users/Kacper/OneDrive/Dokumenty/ZarzadzanieSilownia/build/Desktop_Qt_6_9_0_MinGW_64_bit-Debug/ZarzadzanieSilownia_autogen/mocs_compilation.cpp	ecffc93ac3444441
+999	3608	7705884629146994	CMakeFiles/ZarzadzanieSilownia.dir/ZarzadzanieSilownia_autogen/mocs_compilation.cpp.obj	a5496c9251eb8354
+1003	3649	7705884629575459	CMakeFiles/ZarzadzanieSilownia.dir/main.cpp.obj	4bcb8f31acc1649b
+1006	3686	7705884629950878	CMakeFiles/ZarzadzanieSilownia.dir/mainwindow.cpp.obj	3aff45e51ed97e93
+3686	4103	7705884633943799	ZarzadzanieSilownia.exe	a79d843cdd5c2cc1
