@@ -4,13 +4,13 @@
 #include <QDebug>
 #include <QDir>
 
-// Funkcja do dodawania przykładowych danych testowych
-void dodajPrzykladoweDane() {
-    qDebug() << "=== Dodawanie przykładowych danych ===";
+// Funkcja do dodawania przykładowych klientów
+void dodajPrzykladowychKlientow() {
+    qDebug() << "=== Dodawanie przykładowych klientów ===";
 
     // Sprawdź czy już mamy jakichś klientów
     if (DatabaseManager::getKlienciCount() > 0) {
-        qDebug() << "Baza już zawiera klientów, pomijam dodawanie przykładowych danych";
+        qDebug() << "Baza już zawiera klientów, pomijam dodawanie";
         return;
     }
 
@@ -24,9 +24,65 @@ void dodajPrzykladoweDane() {
     qDebug() << "Dodano" << DatabaseManager::getKlienciCount() << "klientów do bazy";
 }
 
-// Funkcja do testowania funkcjonalności CRUD
-void testujFunkcjonalnosc() {
-    qDebug() << "\n=== Test funkcjonalności CRUD ===";
+// Funkcja do dodawania przykładowych zajęć
+void dodajPrzykladoweZajecia() {
+    qDebug() << "=== Dodawanie przykładowych zajęć ===";
+
+    // Sprawdź czy już mamy jakieś zajęcia
+    if (DatabaseManager::getZajeciaCount() > 0) {
+        qDebug() << "Baza już zawiera zajęcia, pomijam dodawanie";
+        return;
+    }
+
+    // Dodaj przykładowe zajęcia
+    DatabaseManager::addZajecia("Aerobik", "Anna Nowakiewicz", 15, "2025-06-04", "09:00", 60, "Zajęcia cardio dla początkujących");
+    DatabaseManager::addZajecia("CrossFit", "Marcin Silny", 12, "2025-06-04", "10:30", 90, "Intensywny trening funkcjonalny");
+    DatabaseManager::addZajecia("Yoga", "Zen Master", 20, "2025-06-04", "18:00", 75, "Relaksacyjne zajęcia jogi");
+    DatabaseManager::addZajecia("Pilates", "Anna Nowakiewicz", 10, "2025-06-05", "08:00", 60, "Wzmacnianie mięśni głębokich");
+    DatabaseManager::addZajecia("Spinning", "Jakub Rowerzysta", 16, "2025-06-05", "19:00", 45, "Zajęcia na rowerach stacjonarnych");
+    DatabaseManager::addZajecia("Zumba", "Maria Taniec", 25, "2025-06-06", "17:30", 60, "Taneczne cardio");
+    DatabaseManager::addZajecia("TRX", "Marcin Silny", 8, "2025-06-06", "20:00", 50, "Trening z użyciem pasów TRX");
+
+    qDebug() << "Dodano" << DatabaseManager::getZajeciaCount() << "zajęć do bazy";
+}
+
+// Funkcja do testowania funkcjonalności CRUD dla zajęć
+void testujFunkcjonalnoscZajec() {
+    qDebug() << "\n=== Test funkcjonalności CRUD dla zajęć ===";
+
+    // Test pobierania wszystkich zajęć
+    QList<Zajecia> zajecia = DatabaseManager::getAllZajecia();
+    qDebug() << "Liczba zajęć w bazie:" << zajecia.size();
+
+    // Wyświetl pierwszych kilka zajęć
+    for (int i = 0; i < qMin(3, zajecia.size()); i++) {
+        const Zajecia& z = zajecia[i];
+        qDebug() << QString("Zajęcia %1: %2 (%3) - %4 %5, limit: %6, czas: %7 min")
+                        .arg(z.id)
+                        .arg(z.nazwa)
+                        .arg(z.trener.isEmpty() ? "brak trenera" : z.trener)
+                        .arg(z.data.isEmpty() ? "brak daty" : z.data)
+                        .arg(z.czas.isEmpty() ? "brak czasu" : z.czas)
+                        .arg(z.maksUczestnikow)
+                        .arg(z.czasTrwania);
+    }
+
+    // Test wyszukiwania po nazwie
+    QList<Zajecia> aerobik = DatabaseManager::searchZajeciaByNazwa("Aerobik");
+    qDebug() << "Zajęcia zawierające 'Aerobik':" << aerobik.size();
+
+    // Test wyszukiwania po trenerze
+    QList<Zajecia> annaZajecia = DatabaseManager::searchZajeciaByTrener("Anna");
+    qDebug() << "Zajęcia prowadzone przez 'Anna':" << annaZajecia.size();
+
+    // Test pobierania zajęć z konkretnego dnia
+    QList<Zajecia> zajeciaDzisiaj = DatabaseManager::getZajeciaByData("2025-06-04");
+    qDebug() << "Zajęcia z dnia 2025-06-04:" << zajeciaDzisiaj.size();
+}
+
+// Funkcja do testowania funkcjonalności CRUD dla klientów
+void testujFunkcjonalnoscKlientow() {
+    qDebug() << "\n=== Test funkcjonalności CRUD dla klientów ===";
 
     // Test pobierania wszystkich klientów
     QList<Klient> klienci = DatabaseManager::getAllKlienci();
@@ -46,12 +102,6 @@ void testujFunkcjonalnosc() {
     // Test wyszukiwania
     QList<Klient> kowalscyKlienci = DatabaseManager::searchKlienciByNazwisko("Kowal");
     qDebug() << "Klienci z nazwiskiem zawierającym 'Kowal':" << kowalscyKlienci.size();
-
-    // Test pobierania konkretnego klienta
-    if (!klienci.isEmpty()) {
-        Klient pierwszy = DatabaseManager::getKlientById(klienci.first().id);
-        qDebug() << "Pobrany klient o ID" << pierwszy.id << ":" << pierwszy.imie << pierwszy.nazwisko;
-    }
 }
 
 int main(int argc, char *argv[]) {
@@ -64,15 +114,6 @@ int main(int argc, char *argv[]) {
     qDebug() << "=== INFORMACJE O ŚCIEŻKACH ===";
     qDebug() << "Katalog aplikacji:" << appDir;
     qDebug() << "Ścieżka do bazy:" << dbPath;
-    qDebug() << "Katalog roboczy:" << QDir::currentPath();
-
-    // Sprawdź czy plik bazy istnieje przed połączeniem
-    QFileInfo dbFile(dbPath);
-    qDebug() << "Plik bazy istnieje przed połączeniem:" << dbFile.exists();
-    if (dbFile.exists()) {
-        qDebug() << "Rozmiar pliku bazy:" << dbFile.size() << "bajtów";
-        qDebug() << "Ostatnia modyfikacja:" << dbFile.lastModified().toString();
-    }
 
     // 2) Połącz z bazą danych
     if (!DatabaseManager::connect(dbPath)) {
@@ -84,39 +125,18 @@ int main(int argc, char *argv[]) {
     MainWindow w;
     w.createTablesIfNotExist();
 
-    // 4) Sprawdź ponownie czy plik istnieje po utworzeniu tabel
-    qDebug() << "\n=== PO UTWORZENIU TABEL ===";
-    dbFile.refresh();
-    qDebug() << "Plik bazy istnieje po utworzeniu tabel:" << dbFile.exists();
-    if (dbFile.exists()) {
-        qDebug() << "Rozmiar pliku bazy:" << dbFile.size() << "bajtów";
-    }
+    // 4) Dodaj przykładowe dane
+    dodajPrzykladowychKlientow();
+    dodajPrzykladoweZajecia();
 
-    // 5) Dodaj przykładowe dane (tylko przy pierwszym uruchomieniu)
-    dodajPrzykladoweDane();
+    // 5) Przetestuj funkcjonalność
+    testujFunkcjonalnoscKlientow();
+    testujFunkcjonalnoscZajec();
 
-    // 6) Sprawdź rozmiar pliku po dodaniu danych
-    qDebug() << "\n=== PO DODANIU DANYCH ===";
-    dbFile.refresh();
-    if (dbFile.exists()) {
-        qDebug() << "Rozmiar pliku bazy po dodaniu danych:" << dbFile.size() << "bajtów";
-    }
-
-    // 7) Przetestuj funkcjonalność
-    testujFunkcjonalnosc();
-
-    // 8) Pokaż okno
+    // 6) Pokaż okno
     w.show();
 
     int ret = a.exec();
-
-    // 9) Końcowy debug
-    qDebug() << "\n=== PRZED ZAMKNIĘCIEM ===";
-    dbFile.refresh();
-    if (dbFile.exists()) {
-        qDebug() << "Końcowy rozmiar pliku bazy:" << dbFile.size() << "bajtów";
-    }
-
     DatabaseManager::disconnect();
     return ret;
 }

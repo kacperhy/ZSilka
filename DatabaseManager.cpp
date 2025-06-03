@@ -170,8 +170,6 @@ bool DatabaseManager::deleteKlient(int id) {
     return true;
 }
 
-// === Pomocnicze metody ===
-
 bool DatabaseManager::emailExists(const QString& email, int excludeId) {
     if (email.isEmpty()) return false;
 
@@ -225,7 +223,241 @@ int DatabaseManager::getKlienciCount() {
     return 0;
 }
 
-// === Metoda pomocnicza ===
+// === CRUD dla ZAJĘĆ ===
+
+bool DatabaseManager::addZajecia(const QString& nazwa,
+                                 const QString& trener,
+                                 int maksUczestnikow,
+                                 const QString& data,
+                                 const QString& czas,
+                                 int czasTrwania,
+                                 const QString& opis) {
+
+    // Sprawdź czy zajęcia o tej nazwie, dacie i czasie już istnieją
+    if (!data.isEmpty() && !czas.isEmpty() && zajeciaExist(nazwa, data, czas)) {
+        qWarning() << "Zajęcia o tej nazwie, dacie i czasie już istnieją:" << nazwa << data << czas;
+        return false;
+    }
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        INSERT INTO zajecia (nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis)
+        VALUES (:nazwa, :trener, :maksUczestnikow, :data, :czas, :czasTrwania, :opis)
+    )");
+
+    query.bindValue(":nazwa", nazwa);
+    query.bindValue(":trener", trener.isEmpty() ? QVariant() : trener);
+    query.bindValue(":maksUczestnikow", maksUczestnikow);
+    query.bindValue(":data", data.isEmpty() ? QVariant() : data);
+    query.bindValue(":czas", czas.isEmpty() ? QVariant() : czas);
+    query.bindValue(":czasTrwania", czasTrwania);
+    query.bindValue(":opis", opis.isEmpty() ? QVariant() : opis);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd dodawania zajęć:" << query.lastError().text();
+        return false;
+    }
+
+    qDebug() << "Dodano zajęcia:" << nazwa << "(" << trener << ")";
+    return true;
+}
+
+QList<Zajecia> DatabaseManager::getAllZajecia() {
+    QList<Zajecia> zajecia;
+
+    QSqlQuery query(db);
+    if (!query.exec("SELECT id, nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis FROM zajecia ORDER BY data, czas, nazwa")) {
+        qWarning() << "Błąd pobierania zajęć:" << query.lastError().text();
+        return zajecia;
+    }
+
+    while (query.next()) {
+        zajecia.append(queryToZajecia(query));
+    }
+
+    return zajecia;
+}
+
+Zajecia DatabaseManager::getZajeciaById(int id) {
+    Zajecia zajecia = {}; // puste zajęcia
+
+    QSqlQuery query(db);
+    query.prepare("SELECT id, nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis FROM zajecia WHERE id = :id");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania zajęć o ID" << id << ":" << query.lastError().text();
+        return zajecia;
+    }
+
+    if (query.next()) {
+        zajecia = queryToZajecia(query);
+    }
+
+    return zajecia;
+}
+
+bool DatabaseManager::updateZajecia(int id,
+                                    const QString& nazwa,
+                                    const QString& trener,
+                                    int maksUczestnikow,
+                                    const QString& data,
+                                    const QString& czas,
+                                    int czasTrwania,
+                                    const QString& opis) {
+
+    // Sprawdź czy zajęcia o tej nazwie, dacie i czasie już istnieją (z wykluczeniem aktualnych)
+    if (!data.isEmpty() && !czas.isEmpty() && zajeciaExist(nazwa, data, czas, id)) {
+        qWarning() << "Zajęcia o tej nazwie, dacie i czasie już istnieją:" << nazwa << data << czas;
+        return false;
+    }
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        UPDATE zajecia
+        SET nazwa = :nazwa, trener = :trener, maksUczestnikow = :maksUczestnikow,
+            data = :data, czas = :czas, czasTrwania = :czasTrwania, opis = :opis
+        WHERE id = :id
+    )");
+
+    query.bindValue(":id", id);
+    query.bindValue(":nazwa", nazwa);
+    query.bindValue(":trener", trener.isEmpty() ? QVariant() : trener);
+    query.bindValue(":maksUczestnikow", maksUczestnikow);
+    query.bindValue(":data", data.isEmpty() ? QVariant() : data);
+    query.bindValue(":czas", czas.isEmpty() ? QVariant() : czas);
+    query.bindValue(":czasTrwania", czasTrwania);
+    query.bindValue(":opis", opis.isEmpty() ? QVariant() : opis);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd aktualizacji zajęć:" << query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        qWarning() << "Nie znaleziono zajęć o ID:" << id;
+        return false;
+    }
+
+    qDebug() << "Zaktualizowano zajęcia o ID:" << id;
+    return true;
+}
+
+bool DatabaseManager::deleteZajecia(int id) {
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM zajecia WHERE id = :id");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd usuwania zajęć:" << query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        qWarning() << "Nie znaleziono zajęć o ID:" << id;
+        return false;
+    }
+
+    qDebug() << "Usunięto zajęcia o ID:" << id;
+    return true;
+}
+
+// === Pomocnicze metody dla zajęć ===
+
+QList<Zajecia> DatabaseManager::searchZajeciaByNazwa(const QString& nazwa) {
+    QList<Zajecia> zajecia;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT id, nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis FROM zajecia WHERE nazwa LIKE :nazwa ORDER BY data, czas, nazwa");
+    query.bindValue(":nazwa", "%" + nazwa + "%");
+
+    if (!query.exec()) {
+        qWarning() << "Błąd wyszukiwania zajęć po nazwie:" << query.lastError().text();
+        return zajecia;
+    }
+
+    while (query.next()) {
+        zajecia.append(queryToZajecia(query));
+    }
+
+    return zajecia;
+}
+
+QList<Zajecia> DatabaseManager::searchZajeciaByTrener(const QString& trener) {
+    QList<Zajecia> zajecia;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT id, nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis FROM zajecia WHERE trener LIKE :trener ORDER BY data, czas, nazwa");
+    query.bindValue(":trener", "%" + trener + "%");
+
+    if (!query.exec()) {
+        qWarning() << "Błąd wyszukiwania zajęć po trenerze:" << query.lastError().text();
+        return zajecia;
+    }
+
+    while (query.next()) {
+        zajecia.append(queryToZajecia(query));
+    }
+
+    return zajecia;
+}
+
+QList<Zajecia> DatabaseManager::getZajeciaByData(const QString& data) {
+    QList<Zajecia> zajecia;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT id, nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis FROM zajecia WHERE data = :data ORDER BY czas, nazwa");
+    query.bindValue(":data", data);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania zajęć z dnia" << data << ":" << query.lastError().text();
+        return zajecia;
+    }
+
+    while (query.next()) {
+        zajecia.append(queryToZajecia(query));
+    }
+
+    return zajecia;
+}
+
+int DatabaseManager::getZajeciaCount() {
+    QSqlQuery query(db);
+    if (!query.exec("SELECT COUNT(*) FROM zajecia")) {
+        qWarning() << "Błąd liczenia zajęć:" << query.lastError().text();
+        return 0;
+    }
+
+    if (query.next()) {
+        return query.value(0).toInt();
+    }
+
+    return 0;
+}
+
+bool DatabaseManager::zajeciaExist(const QString& nazwa, const QString& data, const QString& czas, int excludeId) {
+    if (nazwa.isEmpty() || data.isEmpty() || czas.isEmpty()) return false;
+
+    QSqlQuery query(db);
+    if (excludeId >= 0) {
+        query.prepare("SELECT COUNT(*) FROM zajecia WHERE nazwa = :nazwa AND data = :data AND czas = :czas AND id != :excludeId");
+        query.bindValue(":excludeId", excludeId);
+    } else {
+        query.prepare("SELECT COUNT(*) FROM zajecia WHERE nazwa = :nazwa AND data = :data AND czas = :czas");
+    }
+    query.bindValue(":nazwa", nazwa);
+    query.bindValue(":data", data);
+    query.bindValue(":czas", czas);
+
+    if (!query.exec() || !query.next()) {
+        qWarning() << "Błąd sprawdzania istnienia zajęć:" << query.lastError().text();
+        return false;
+    }
+
+    return query.value(0).toInt() > 0;
+}
+
+// === Metody pomocnicze ===
 
 Klient DatabaseManager::queryToKlient(QSqlQuery& query) {
     Klient klient;
@@ -238,4 +470,17 @@ Klient DatabaseManager::queryToKlient(QSqlQuery& query) {
     klient.dataRejestracji = query.value("dataRejestracji").toString();
     klient.uwagi = query.value("uwagi").toString();
     return klient;
+}
+
+Zajecia DatabaseManager::queryToZajecia(QSqlQuery& query) {
+    Zajecia zajecia;
+    zajecia.id = query.value("id").toInt();
+    zajecia.nazwa = query.value("nazwa").toString();
+    zajecia.trener = query.value("trener").toString();
+    zajecia.maksUczestnikow = query.value("maksUczestnikow").toInt();
+    zajecia.data = query.value("data").toString();
+    zajecia.czas = query.value("czas").toString();
+    zajecia.czasTrwania = query.value("czasTrwania").toInt();
+    zajecia.opis = query.value("opis").toString();
+    return zajecia;
 }

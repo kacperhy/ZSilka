@@ -16,6 +16,17 @@ struct Klient {
     QString uwagi;
 };
 
+struct Zajecia {
+    int id;
+    QString nazwa;
+    QString trener;
+    int maksUczestnikow;
+    QString data;           // format YYYY-MM-DD
+    QString czas;           // format HH:MM
+    int czasTrwania;        // w minutach
+    QString opis;
+};
+
 class DatabaseManager {
 public:
     // === Podstawowe metody połączenia ===
@@ -51,8 +62,6 @@ public:
     // Usuwanie klienta
     static bool deleteKlient(int id);
 
-    // === Pomocnicze metody ===
-
     // Sprawdzanie czy email już istnieje
     static bool emailExists(const QString& email, int excludeId = -1);
 
@@ -62,12 +71,60 @@ public:
     // Liczba wszystkich klientów
     static int getKlienciCount();
 
+    // === CRUD dla ZAJĘĆ ===
+
+    // Dodawanie nowych zajęć
+    static bool addZajecia(const QString& nazwa,
+                           const QString& trener = QString(),
+                           int maksUczestnikow = 20,
+                           const QString& data = QString(),
+                           const QString& czas = QString(),
+                           int czasTrwania = 60,
+                           const QString& opis = QString());
+
+    // Pobieranie wszystkich zajęć
+    static QList<Zajecia> getAllZajecia();
+
+    // Pobieranie zajęć po ID
+    static Zajecia getZajeciaById(int id);
+
+    // Aktualizacja danych zajęć
+    static bool updateZajecia(int id,
+                              const QString& nazwa,
+                              const QString& trener = QString(),
+                              int maksUczestnikow = 20,
+                              const QString& data = QString(),
+                              const QString& czas = QString(),
+                              int czasTrwania = 60,
+                              const QString& opis = QString());
+
+    // Usuwanie zajęć
+    static bool deleteZajecia(int id);
+
+    // === Pomocnicze metody dla zajęć ===
+
+    // Wyszukiwanie zajęć po nazwie
+    static QList<Zajecia> searchZajeciaByNazwa(const QString& nazwa);
+
+    // Wyszukiwanie zajęć po trenerze
+    static QList<Zajecia> searchZajeciaByTrener(const QString& trener);
+
+    // Pobieranie zajęć w konkretnym dniu
+    static QList<Zajecia> getZajeciaByData(const QString& data);
+
+    // Liczba wszystkich zajęć
+    static int getZajeciaCount();
+
+    // Sprawdzanie czy nazwa zajęć już istnieje (dla tego samego dnia i czasu)
+    static bool zajeciaExist(const QString& nazwa, const QString& data, const QString& czas, int excludeId = -1);
+
 private:
     DatabaseManager() = default;
     static QSqlDatabase db;
 
-    // Pomocnicza metoda do konwersji QSqlQuery na strukturę Klient
+    // Pomocnicze metody do konwersji QSqlQuery na struktury
     static Klient queryToKlient(class QSqlQuery& query);
+    static Zajecia queryToZajecia(class QSqlQuery& query);
 };
 
 #endif // DATABASEMANAGER_H
