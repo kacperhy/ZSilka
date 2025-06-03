@@ -9,6 +9,7 @@
 #include <QDateEdit>
 #include <QTimeEdit>
 #include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
@@ -64,6 +65,18 @@ private slots:
     void pokazStatystyki();
     void pokazAktywnychKlientow();
 
+    // === Slots dla zarządzania KARNETAMI ===
+    void odswiezListeKarnetow();
+    void dodajKarnet();
+    void edytujKarnet();
+    void usunKarnet();
+    void wyczyscFormularzKarnetu();
+    void filtrujKarnety();
+    void karnetWybrany();  // gdy klikniemy na wiersz w tabeli karnetów
+    void klientKarnetuWybrany();  // gdy wybierzemy klienta w comboBox
+    void pokazStatystykiKarnetow();
+    void pokazWygasajaceKarnety();
+
     // === Slots dla menu ===
     void zamknijAplikacje();
     void oProgramie();
@@ -79,6 +92,9 @@ private:
 
     // === Zmienne pomocnicze dla REZERWACJI ===
     int aktualnieWybranaRezerwacjaId; // -1 gdy nic nie wybrane, >0 gdy wybrane
+
+    // === Zmienne pomocnicze dla KARNETÓW ===
+    int aktualnieEdytowanyKarnetId; // -1 gdy dodajemy nowy, >0 gdy edytujemy
 
     // === Metody pomocnicze - OGÓLNE ===
     void setupUI();                    // Konfiguracja UI po uruchomieniu
@@ -114,6 +130,20 @@ private:
     void wyczyscInfoZajec();                                               // Wyczyść informacje o zajęciach
     void aktualizujLicznikRezerwacji();                                    // Aktualizuj wyświetlaną liczbę rezerwacji
     void aktualizujPrzyciskAnuluj();                                       // Aktualizuj przycisk anulowania
+
+    // === Metody pomocnicze - KARNETY ===
+    void setupTableKarnety();                                           // Konfiguracja tabeli karnetów
+    void zaladujKarnetyDoTabeli(const QList<Karnet>& karnety);          // Załaduj karnety do tabeli
+    void zaladujKarnetDoFormularza(const Karnet& karnet);               // Załaduj dane karnetu do formularza
+    void zaladujKlientowDoComboBoxKarnetu();                            // Załaduj klientów do ComboBox karnetów
+    Karnet pobierzDaneKarnetuZFormularza();                             // Pobierz dane z formularza karnetu
+    bool walidujFormularzKarnetu();                                     // Sprawdź czy formularz karnetu jest poprawny
+    void ustawTrybDodawaniaKarnetu();                                   // Ustaw UI w tryb dodawania nowego karnetu
+    void ustawTrybEdycjiKarnetu();                                      // Ustaw UI w tryb edycji karnetu
+    void aktualizujLicznikKarnetow();                                   // Aktualizuj wyświetlaną liczbę karnetów
+    void aktualizujInfoKlienta();                                       // Aktualizuj informacje o wybranym kliencie
+    void wyczyscInfoKlienta();                                          // Wyczyść informacje o kliencie
+    void obliczCeneKarnetu();                                           // Oblicz cenę karnetu na podstawie typu
 
     // === Metody ogólne ===
     void pokazKomunikat(const QString& tytul, const QString& tresc, QMessageBox::Icon typ = QMessageBox::Information);

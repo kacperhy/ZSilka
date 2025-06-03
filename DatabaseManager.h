@@ -43,6 +43,21 @@ struct Rezerwacja {
     QString czasZajec;
 };
 
+struct Karnet {
+    int id;
+    int idKlienta;
+    QString typ;            // "normalny", "studencki"
+    QString dataRozpoczecia; // format YYYY-MM-DD
+    QString dataZakonczenia; // format YYYY-MM-DD
+    double cena;
+    bool czyAktywny;        // true/false
+
+    // Dodatkowe informacje (z joinów)
+    QString imieKlienta;
+    QString nazwiskoKlienta;
+    QString emailKlienta;
+};
+
 class DatabaseManager {
 public:
     // === Podstawowe metody połączenia ===
@@ -97,52 +112,83 @@ public:
     static bool zajeciaExist(const QString& nazwa, const QString& data, const QString& czas, int excludeId = -1);
 
     // === CRUD dla REZERWACJI ===
-
-    // Dodawanie nowej rezerwacji
     static bool addRezerwacja(int idKlienta, int idZajec, const QString& status = "aktywna");
-
-    // Pobieranie wszystkich rezerwacji (z informacjami o klientach i zajęciach)
     static QList<Rezerwacja> getAllRezerwacje();
-
-    // Pobieranie rezerwacji po ID
     static Rezerwacja getRezerwacjaById(int id);
-
-    // Aktualizacja statusu rezerwacji
     static bool updateRezerwacjaStatus(int id, const QString& status);
-
-    // Usuwanie rezerwacji (anulowanie)
     static bool deleteRezerwacja(int id);
 
     // === Pomocnicze metody dla rezerwacji ===
-
-    // Sprawdzanie czy klient ma już rezerwację na te zajęcia
     static bool klientMaRezerwacje(int idKlienta, int idZajec);
-
-    // Pobieranie liczby aktywnych rezerwacji na zajęcia
     static int getIloscAktywnychRezerwacji(int idZajec);
-
-    // Sprawdzanie czy można dodać rezerwację (czy nie przekroczono limitu)
     static bool moznaZarezerwowac(int idZajec);
-
-    // Pobieranie rezerwacji konkretnego klienta
     static QList<Rezerwacja> getRezerwacjeKlienta(int idKlienta);
-
-    // Pobieranie rezerwacji dla konkretnych zajęć
     static QList<Rezerwacja> getRezerwacjeZajec(int idZajec);
-
-    // Pobieranie zajęć dostępnych do rezerwacji (z wolnymi miejscami)
     static QList<Zajecia> getZajeciaDostepneDoRezerwacji();
-
-    // Pobieranie liczby wszystkich rezerwacji
     static int getRezerwacjeCount();
 
+    // === CRUD dla KARNETÓW ===
+
+    // Dodawanie nowego karnetu
+    static bool addKarnet(int idKlienta,
+                          const QString& typ,
+                          const QString& dataRozpoczecia,
+                          const QString& dataZakonczenia,
+                          double cena,
+                          bool czyAktywny = true);
+
+    // Pobieranie wszystkich karnetów (z informacjami o klientach)
+    static QList<Karnet> getAllKarnety();
+
+    // Pobieranie karnetu po ID
+    static Karnet getKarnetById(int id);
+
+    // Aktualizacja karnetu
+    static bool updateKarnet(int id,
+                             int idKlienta,
+                             const QString& typ,
+                             const QString& dataRozpoczecia,
+                             const QString& dataZakonczenia,
+                             double cena,
+                             bool czyAktywny);
+
+    // Usuwanie karnetu
+    static bool deleteKarnet(int id);
+
+    // === Pomocnicze metody dla karnetów ===
+
+    // Pobieranie karnetów konkretnego klienta
+    static QList<Karnet> getKarnetyKlienta(int idKlienta);
+
+    // Pobieranie aktywnych karnetów klienta
+    static QList<Karnet> getAktywneKarnetyKlienta(int idKlienta);
+
+    // Sprawdzanie czy klient ma aktywny karnet
+    static bool klientMaAktywnyKarnet(int idKlienta);
+
+    // Filtrowanie karnetów po typie
+    static QList<Karnet> getKarnetyByTyp(const QString& typ);
+
+    // Filtrowanie karnetów po statusie (aktywne/nieaktywne)
+    static QList<Karnet> getKarnetyByStatus(bool czyAktywny);
+
+    // Pobieranie karnetów wygasających w określonym terminie
+    static QList<Karnet> getKarnetyWygasajace(const QString& dataOd, const QString& dataDo);
+
+    // Pobieranie liczby wszystkich karnetów
+    static int getKarnetyCount();
+
+    // Sprawdzanie czy można dodać karnet (czy klient nie ma już aktywnego karnetu tego typu)
+    static bool moznaUtworzycKarnet(int idKlienta, const QString& typ);
+
     // === Metody raportowe ===
-
-    // Najpopularniejsze zajęcia (według liczby rezerwacji)
     static QList<QPair<QString, int>> getNajpopularniejszeZajecia(int limit = 10);
-
-    // Najaktywniejszi klienci (według liczby rezerwacji)
     static QList<QPair<QString, int>> getNajaktywniejszychKlientow(int limit = 10);
+
+    // Statystyki karnetów
+    static QList<QPair<QString, int>> getStatystykiKarnetow(); // [typ, liczba]
+    static double getCalkowitePrzychodyZKarnetow();
+    static int getLiczbaAktywnychKarnetow();
 
 private:
     DatabaseManager() = default;
@@ -152,6 +198,7 @@ private:
     static Klient queryToKlient(class QSqlQuery& query);
     static Zajecia queryToZajecia(class QSqlQuery& query);
     static Rezerwacja queryToRezerwacja(class QSqlQuery& query);
+    static Karnet queryToKarnet(class QSqlQuery& query);
 };
 
 #endif // DATABASEMANAGER_H

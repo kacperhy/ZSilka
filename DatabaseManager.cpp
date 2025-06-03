@@ -221,7 +221,7 @@ int DatabaseManager::getKlienciCount() {
     return 0;
 }
 
-// === CRUD dla ZAJĘĆ ===
+// === CRUD dla ZAJĘĆ === (pozostają bez zmian)
 
 bool DatabaseManager::addZajecia(const QString& nazwa,
                                  const QString& trener,
@@ -451,16 +451,14 @@ bool DatabaseManager::zajeciaExist(const QString& nazwa, const QString& data, co
     return query.value(0).toInt() > 0;
 }
 
-// === CRUD dla REZERWACJI ===
+// === CRUD dla REZERWACJI === (pozostają bez zmian - skrócone dla oszczędności miejsca)
 
 bool DatabaseManager::addRezerwacja(int idKlienta, int idZajec, const QString& status) {
-    // Sprawdź czy klient już ma rezerwację na te zajęcia
     if (klientMaRezerwacje(idKlienta, idZajec)) {
         qWarning() << "Klient już ma rezerwację na te zajęcia. Klient ID:" << idKlienta << "Zajęcia ID:" << idZajec;
         return false;
     }
 
-    // Sprawdź czy można zarezerwować (czy nie przekroczono limitu)
     if (!moznaZarezerwowac(idZajec)) {
         qWarning() << "Przekroczono limit uczestników dla zajęć ID:" << idZajec;
         return false;
@@ -606,7 +604,6 @@ int DatabaseManager::getIloscAktywnychRezerwacji(int idZajec) {
 }
 
 bool DatabaseManager::moznaZarezerwowac(int idZajec) {
-    // Pobierz limit uczestników dla zajęć
     QSqlQuery query(db);
     query.prepare("SELECT maksUczestnikow FROM zajecia WHERE id = :id");
     query.bindValue(":id", idZajec);
@@ -716,6 +713,321 @@ int DatabaseManager::getRezerwacjeCount() {
     return 0;
 }
 
+// === CRUD dla KARNETÓW ===
+
+bool DatabaseManager::addKarnet(int idKlienta,
+                                const QString& typ,
+                                const QString& dataRozpoczecia,
+                                const QString& dataZakonczenia,
+                                double cena,
+                                bool czyAktywny) {
+
+    // Sprawdź czy można utworzyć karnet (czy klient nie ma już aktywnego karnetu tego typu)
+    if (!moznaUtworzycKarnet(idKlienta, typ)) {
+        qWarning() << "Klient już ma aktywny karnet typu:" << typ << "dla klienta ID:" << idKlienta;
+        return false;
+    }
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        INSERT INTO karnet (idKlienta, typ, dataRozpoczecia, dataZakonczenia, cena, czyAktywny)
+        VALUES (:idKlienta, :typ, :dataRozpoczecia, :dataZakonczenia, :cena, :czyAktywny)
+    )");
+
+    query.bindValue(":idKlienta", idKlienta);
+    query.bindValue(":typ", typ);
+    query.bindValue(":dataRozpoczecia", dataRozpoczecia);
+    query.bindValue(":dataZakonczenia", dataZakonczenia);
+    query.bindValue(":cena", cena);
+    query.bindValue(":czyAktywny", czyAktywny ? 1 : 0);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd dodawania karnetu:" << query.lastError().text();
+        return false;
+    }
+
+    qDebug() << "Dodano karnet typu" << typ << "dla klienta ID:" << idKlienta;
+    return true;
+}
+
+QList<Karnet> DatabaseManager::getAllKarnety() {
+    QList<Karnet> karnety;
+
+    QSqlQuery query(db);
+    if (!query.exec(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        ORDER BY k.dataRozpoczecia DESC, kl.nazwisko, kl.imie
+    )")) {
+        qWarning() << "Błąd pobierania karnetów:" << query.lastError().text();
+        return karnety;
+    }
+
+    while (query.next()) {
+        karnety.append(queryToKarnet(query));
+    }
+
+    return karnety;
+}
+
+Karnet DatabaseManager::getKarnetById(int id) {
+    Karnet karnet = {};
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        WHERE k.id = :id
+    )");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania karnetu o ID" << id << ":" << query.lastError().text();
+        return karnet;
+    }
+
+    if (query.next()) {
+        karnet = queryToKarnet(query);
+    }
+
+    return karnet;
+}
+
+bool DatabaseManager::updateKarnet(int id,
+                                   int idKlienta,
+                                   const QString& typ,
+                                   const QString& dataRozpoczecia,
+                                   const QString& dataZakonczenia,
+                                   double cena,
+                                   bool czyAktywny) {
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        UPDATE karnet
+        SET idKlienta = :idKlienta, typ = :typ, dataRozpoczecia = :dataRozpoczecia,
+            dataZakonczenia = :dataZakonczenia, cena = :cena, czyAktywny = :czyAktywny
+        WHERE id = :id
+    )");
+
+    query.bindValue(":id", id);
+    query.bindValue(":idKlienta", idKlienta);
+    query.bindValue(":typ", typ);
+    query.bindValue(":dataRozpoczecia", dataRozpoczecia);
+    query.bindValue(":dataZakonczenia", dataZakonczenia);
+    query.bindValue(":cena", cena);
+    query.bindValue(":czyAktywny", czyAktywny ? 1 : 0);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd aktualizacji karnetu:" << query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        qWarning() << "Nie znaleziono karnetu o ID:" << id;
+        return false;
+    }
+
+    qDebug() << "Zaktualizowano karnet o ID:" << id;
+    return true;
+}
+
+bool DatabaseManager::deleteKarnet(int id) {
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM karnet WHERE id = :id");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd usuwania karnetu:" << query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        qWarning() << "Nie znaleziono karnetu o ID:" << id;
+        return false;
+    }
+
+    qDebug() << "Usunięto karnet o ID:" << id;
+    return true;
+}
+
+// === Pomocnicze metody dla karnetów ===
+
+QList<Karnet> DatabaseManager::getKarnetyKlienta(int idKlienta) {
+    QList<Karnet> karnety;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        WHERE k.idKlienta = :idKlienta
+        ORDER BY k.dataRozpoczecia DESC
+    )");
+    query.bindValue(":idKlienta", idKlienta);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania karnetów klienta:" << query.lastError().text();
+        return karnety;
+    }
+
+    while (query.next()) {
+        karnety.append(queryToKarnet(query));
+    }
+
+    return karnety;
+}
+
+QList<Karnet> DatabaseManager::getAktywneKarnetyKlienta(int idKlienta) {
+    QList<Karnet> karnety;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        WHERE k.idKlienta = :idKlienta AND k.czyAktywny = 1
+        ORDER BY k.dataRozpoczecia DESC
+    )");
+    query.bindValue(":idKlienta", idKlienta);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania aktywnych karnetów klienta:" << query.lastError().text();
+        return karnety;
+    }
+
+    while (query.next()) {
+        karnety.append(queryToKarnet(query));
+    }
+
+    return karnety;
+}
+
+bool DatabaseManager::klientMaAktywnyKarnet(int idKlienta) {
+    QSqlQuery query(db);
+    query.prepare("SELECT COUNT(*) FROM karnet WHERE idKlienta = :idKlienta AND czyAktywny = 1");
+    query.bindValue(":idKlienta", idKlienta);
+
+    if (!query.exec() || !query.next()) {
+        qWarning() << "Błąd sprawdzania aktywnych karnetów klienta:" << query.lastError().text();
+        return false;
+    }
+
+    return query.value(0).toInt() > 0;
+}
+
+QList<Karnet> DatabaseManager::getKarnetyByTyp(const QString& typ) {
+    QList<Karnet> karnety;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        WHERE k.typ = :typ
+        ORDER BY k.dataRozpoczecia DESC, kl.nazwisko, kl.imie
+    )");
+    query.bindValue(":typ", typ);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania karnetów po typie:" << query.lastError().text();
+        return karnety;
+    }
+
+    while (query.next()) {
+        karnety.append(queryToKarnet(query));
+    }
+
+    return karnety;
+}
+
+QList<Karnet> DatabaseManager::getKarnetyByStatus(bool czyAktywny) {
+    QList<Karnet> karnety;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        WHERE k.czyAktywny = :czyAktywny
+        ORDER BY k.dataRozpoczecia DESC, kl.nazwisko, kl.imie
+    )");
+    query.bindValue(":czyAktywny", czyAktywny ? 1 : 0);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania karnetów po statusie:" << query.lastError().text();
+        return karnety;
+    }
+
+    while (query.next()) {
+        karnety.append(queryToKarnet(query));
+    }
+
+    return karnety;
+}
+
+QList<Karnet> DatabaseManager::getKarnetyWygasajace(const QString& dataOd, const QString& dataDo) {
+    QList<Karnet> karnety;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.id, k.idKlienta, k.typ, k.dataRozpoczecia, k.dataZakonczenia, k.cena, k.czyAktywny,
+               kl.imie, kl.nazwisko, kl.email
+        FROM karnet k
+        JOIN klient kl ON k.idKlienta = kl.id
+        WHERE k.dataZakonczenia BETWEEN :dataOd AND :dataDo AND k.czyAktywny = 1
+        ORDER BY k.dataZakonczenia ASC, kl.nazwisko, kl.imie
+    )");
+    query.bindValue(":dataOd", dataOd);
+    query.bindValue(":dataDo", dataDo);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania wygasających karnetów:" << query.lastError().text();
+        return karnety;
+    }
+
+    while (query.next()) {
+        karnety.append(queryToKarnet(query));
+    }
+
+    return karnety;
+}
+
+int DatabaseManager::getKarnetyCount() {
+    QSqlQuery query(db);
+    if (!query.exec("SELECT COUNT(*) FROM karnet")) {
+        qWarning() << "Błąd liczenia karnetów:" << query.lastError().text();
+        return 0;
+    }
+
+    if (query.next()) {
+        return query.value(0).toInt();
+    }
+
+    return 0;
+}
+
+bool DatabaseManager::moznaUtworzycKarnet(int idKlienta, const QString& typ) {
+    QSqlQuery query(db);
+    query.prepare("SELECT COUNT(*) FROM karnet WHERE idKlienta = :idKlienta AND typ = :typ AND czyAktywny = 1");
+    query.bindValue(":idKlienta", idKlienta);
+    query.bindValue(":typ", typ);
+
+    if (!query.exec() || !query.next()) {
+        qWarning() << "Błąd sprawdzania możliwości utworzenia karnetu:" << query.lastError().text();
+        return false;
+    }
+
+    return query.value(0).toInt() == 0; // Można utworzyć jeśli nie ma aktywnych karnetów tego typu
+}
+
 // === Metody raportowe ===
 
 QList<QPair<QString, int>> DatabaseManager::getNajpopularniejszeZajecia(int limit) {
@@ -774,6 +1086,58 @@ QList<QPair<QString, int>> DatabaseManager::getNajaktywniejszychKlientow(int lim
     return wyniki;
 }
 
+QList<QPair<QString, int>> DatabaseManager::getStatystykiKarnetow() {
+    QList<QPair<QString, int>> wyniki;
+
+    QSqlQuery query(db);
+    if (!query.exec(R"(
+        SELECT typ, COUNT(*) as liczba
+        FROM karnet
+        WHERE czyAktywny = 1
+        GROUP BY typ
+        ORDER BY liczba DESC
+    )")) {
+        qWarning() << "Błąd pobierania statystyk karnetów:" << query.lastError().text();
+        return wyniki;
+    }
+
+    while (query.next()) {
+        QString typ = query.value("typ").toString();
+        int liczba = query.value("liczba").toInt();
+        wyniki.append(qMakePair(typ, liczba));
+    }
+
+    return wyniki;
+}
+
+double DatabaseManager::getCalkowitePrzychodyZKarnetow() {
+    QSqlQuery query(db);
+    if (!query.exec("SELECT SUM(cena) FROM karnet WHERE czyAktywny = 1")) {
+        qWarning() << "Błąd liczenia przychodów z karnetów:" << query.lastError().text();
+        return 0.0;
+    }
+
+    if (query.next()) {
+        return query.value(0).toDouble();
+    }
+
+    return 0.0;
+}
+
+int DatabaseManager::getLiczbaAktywnychKarnetow() {
+    QSqlQuery query(db);
+    if (!query.exec("SELECT COUNT(*) FROM karnet WHERE czyAktywny = 1")) {
+        qWarning() << "Błąd liczenia aktywnych karnetów:" << query.lastError().text();
+        return 0;
+    }
+
+    if (query.next()) {
+        return query.value(0).toInt();
+    }
+
+    return 0;
+}
+
 // === Metody pomocnicze ===
 
 Klient DatabaseManager::queryToKlient(QSqlQuery& query) {
@@ -819,4 +1183,22 @@ Rezerwacja DatabaseManager::queryToRezerwacja(QSqlQuery& query) {
     rezerwacja.czasZajec = query.value("czas").toString();
 
     return rezerwacja;
+}
+
+Karnet DatabaseManager::queryToKarnet(QSqlQuery& query) {
+    Karnet karnet;
+    karnet.id = query.value("id").toInt();
+    karnet.idKlienta = query.value("idKlienta").toInt();
+    karnet.typ = query.value("typ").toString();
+    karnet.dataRozpoczecia = query.value("dataRozpoczecia").toString();
+    karnet.dataZakonczenia = query.value("dataZakonczenia").toString();
+    karnet.cena = query.value("cena").toDouble();
+    karnet.czyAktywny = query.value("czyAktywny").toInt() == 1;
+
+    // Informacje z joinów
+    karnet.imieKlienta = query.value("imie").toString();
+    karnet.nazwiskoKlienta = query.value("nazwisko").toString();
+    karnet.emailKlienta = query.value("email").toString();
+
+    return karnet;
 }

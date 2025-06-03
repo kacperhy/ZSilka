@@ -1063,6 +1063,430 @@
         </item>
        </layout>
       </widget>
+
+      <!-- ==================== ZAKŁADKA 4: KARNETY ==================== -->
+      <widget class="QWidget" name="tabKarnety">
+       <attribute name="title">
+        <string>🎫 Karnety</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_karnety">
+        <item>
+         <!-- LEWA STRONA - LISTA KARNETÓW -->
+         <widget class="QWidget" name="leftPanelKarnety" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>650</width>
+            <height>0</height>
+           </size>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_leftKarnety">
+           <item>
+            <widget class="QLabel" name="labelKarnetyTitle">
+             <property name="text">
+              <string>Lista Karnetów</string>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>14</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+            </widget>
+           </item>
+
+           <!-- Filtrowanie karnetów -->
+           <item>
+            <layout class="QHBoxLayout" name="filterLayoutKarnety">
+             <item>
+              <widget class="QComboBox" name="comboBoxFilterTypKarnetu">
+               <item>
+                <property name="text">
+                 <string>Wszystkie typy</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Tylko normalne</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Tylko studenckie</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QComboBox" name="comboBoxFilterStatusKarnetu">
+               <item>
+                <property name="text">
+                 <string>Wszystkie karnety</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Tylko aktywne</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Tylko nieaktywne</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButtonFilterKarnety">
+               <property name="text">
+                <string>Filtruj</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacerFilterKarnety">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+
+           <!-- Tabela z karnetami -->
+           <item>
+            <widget class="QTableWidget" name="tableWidgetKarnety">
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectRows</enum>
+             </property>
+             <property name="sortingEnabled">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+
+           <!-- Przyciski akcji karnetów -->
+           <item>
+            <layout class="QHBoxLayout" name="buttonsLayoutKarnety">
+             <item>
+              <widget class="QPushButton" name="pushButtonOdswiezKarnety">
+               <property name="text">
+                <string>Odśwież listę</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacerKarnety">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelLiczbaKarnetow">
+               <property name="text">
+                <string>Liczba karnetów: 0</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+
+        <item>
+         <!-- PRAWA STRONA - FORMULARZ KARNETU -->
+         <widget class="QWidget" name="rightPanelKarnety" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>400</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>500</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_rightKarnety">
+           <item>
+            <widget class="QLabel" name="labelFormularzKarnetuTitle">
+             <property name="text">
+              <string>Formularz Karnetu</string>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>14</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+            </widget>
+           </item>
+
+           <!-- Formularz karnetu -->
+           <item>
+            <widget class="QGroupBox" name="groupBoxFormularzKarnetu">
+             <property name="title">
+              <string>Dane karnetu</string>
+             </property>
+             <layout class="QFormLayout" name="formLayoutKarnetu">
+              <item row="0" column="0">
+               <widget class="QLabel" name="labelKlientKarnetu">
+                <property name="text">
+                 <string>Klient *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="comboBoxKlientKarnetu">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="labelTypKarnetu">
+                <property name="text">
+                 <string>Typ karnetu *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="comboBoxTypKarnetu">
+                <item>
+                 <property name="text">
+                  <string>normalny</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>studencki</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="labelDataRozpocKarnetu">
+                <property name="text">
+                 <string>Data rozpoczęcia *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QDateEdit" name="dateEditRozpocKarnetu">
+                <property name="displayFormat">
+                 <string>yyyy-MM-dd</string>
+                </property>
+                <property name="calendarPopup">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="labelDataZakonKarnetu">
+                <property name="text">
+                 <string>Data zakończenia *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QDateEdit" name="dateEditZakonKarnetu">
+                <property name="displayFormat">
+                 <string>yyyy-MM-dd</string>
+                </property>
+                <property name="calendarPopup">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="labelCenaKarnetu">
+                <property name="text">
+                 <string>Cena *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QDoubleSpinBox" name="doubleSpinBoxCenaKarnetu">
+                <property name="suffix">
+                 <string> PLN</string>
+                </property>
+                <property name="minimum">
+                 <double>0.010000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>9999.990000000000000</double>
+                </property>
+                <property name="value">
+                 <double>150.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="labelStatusKarnetu">
+                <property name="text">
+                 <string>Status:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QComboBox" name="comboBoxStatusKarnetu">
+                <item>
+                 <property name="text">
+                  <string>aktywny</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>nieaktywny</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+
+           <!-- Informacje o kliencie -->
+           <item>
+            <widget class="QGroupBox" name="groupBoxInfoKlient">
+             <property name="title">
+              <string>Informacje o kliencie</string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayoutInfoKlient">
+              <item>
+               <widget class="QLabel" name="labelInfoImieNazwisko">
+                <property name="text">
+                 <string>Klient: -</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="labelInfoEmailKlient">
+                <property name="text">
+                 <string>Email: -</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="labelInfoAktywneKarnety">
+                <property name="text">
+                 <string>Aktywne karnety: -</string>
+                </property>
+                <property name="font">
+                 <font>
+                  <weight>75</weight>
+                  <bold>true</bold>
+                 </font>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+
+           <!-- Przyciski formularza karnetu -->
+           <item>
+            <layout class="QHBoxLayout" name="formButtonsLayoutKarnetu">
+             <item>
+              <widget class="QPushButton" name="pushButtonDodajKarnet">
+               <property name="text">
+                <string>Dodaj karnet</string>
+               </property>
+               <property name="default">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButtonEdytujKarnet">
+               <property name="text">
+                <string>Zapisz zmiany</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="formButtonsLayoutKarnetu2">
+             <item>
+              <widget class="QPushButton" name="pushButtonUsunKarnet">
+               <property name="text">
+                <string>Usuń karnet</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButtonWyczyscKarnet">
+               <property name="text">
+                <string>Wyczyść formularz</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+
+           <!-- Statystyki karnetów -->
+           <item>
+            <widget class="QGroupBox" name="groupBoxStatystykiKarnety">
+             <property name="title">
+              <string>Statystyki</string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayoutStatystykiKarnety">
+              <item>
+               <widget class="QPushButton" name="pushButtonPokazStatystykiKarnety">
+                <property name="text">
+                 <string>Pokaż statystyki karnetów</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButtonPokazWygasajace">
+                <property name="text">
+                 <string>Pokaż wygasające karnety</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+
+           <item>
+            <widget class="QLabel" name="labelWymaganeKarnety">
+             <property name="text">
+              <string>* - pola wymagane</string>
+             </property>
+             <property name="font">
+              <font>
+               <italic>true</italic>
+              </font>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="verticalSpacerKarnety">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
      </widget>
     </item>
    </layout>

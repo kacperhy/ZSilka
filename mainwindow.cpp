@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     , aktualnieEdytowanyKlientId(-1)
     , aktualnieEdytowaneZajeciaId(-1)
     , aktualnieWybranaRezerwacjaId(-1)
+    , aktualnieEdytowanyKarnetId(-1)  // <- To powinno być w liście inicjalizacyjnej
 {
     ui->setupUi(this);
     setupUI();
@@ -27,11 +28,13 @@ MainWindow::MainWindow(QWidget *parent)
     setupTableKlienci();
     setupTableZajecia();
     setupTableRezerwacje();
+    setupTableKarnety();
 
     // Załaduj dane do wszystkich tabel
     odswiezListeKlientow();
     odswiezListeZajec();
     odswiezListeRezerwacji();
+    odswiezListeKarnetow();
 }
 
 MainWindow::~MainWindow()
@@ -292,6 +295,14 @@ void MainWindow::setupUI() {
 
     // Ustaw pierwszą zakładkę jako aktywną
     ui->tabWidget->setCurrentIndex(0);
+
+    // Ustaw domyślne wartości dla karnetów
+    ui->dateEditRozpocKarnetu->setDate(QDate::currentDate());
+    ui->dateEditZakonKarnetu->setDate(QDate::currentDate().addMonths(1));
+    ui->doubleSpinBoxCenaKarnetu->setValue(150.0);
+    ui->comboBoxStatusKarnetu->setCurrentIndex(0); // Aktywny
+    wyczyscInfoKlienta();
+    ustawTrybDodawaniaKarnetu();
 }
 
 void MainWindow::setupConnections() {
@@ -344,6 +355,23 @@ void MainWindow::setupConnections() {
     // === MENU ===
     connect(ui->actionZamknij, &QAction::triggered, this, &MainWindow::zamknijAplikacje);
     connect(ui->actionOProgramie, &QAction::triggered, this, &MainWindow::oProgramie);
+
+    // === PRZYCISKI KARNETÓW ===
+    connect(ui->pushButtonDodajKarnet, &QPushButton::clicked, this, &MainWindow::dodajKarnet);
+    connect(ui->pushButtonEdytujKarnet, &QPushButton::clicked, this, &MainWindow::edytujKarnet);
+    connect(ui->pushButtonUsunKarnet, &QPushButton::clicked, this, &MainWindow::usunKarnet);
+    connect(ui->pushButtonWyczyscKarnet, &QPushButton::clicked, this, &MainWindow::wyczyscFormularzKarnetu);
+    connect(ui->pushButtonOdswiezKarnety, &QPushButton::clicked, this, &MainWindow::odswiezListeKarnetow);
+    connect(ui->pushButtonFilterKarnety, &QPushButton::clicked, this, &MainWindow::filtrujKarnety);
+    connect(ui->pushButtonPokazStatystykiKarnety, &QPushButton::clicked, this, &MainWindow::pokazStatystykiKarnetow);
+    connect(ui->pushButtonPokazWygasajace, &QPushButton::clicked, this, &MainWindow::pokazWygasajaceKarnety);
+
+    // === COMBOBOX KARNETÓW ===
+    connect(ui->comboBoxKlientKarnetu, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::klientKarnetuWybrany);
+    connect(ui->comboBoxTypKarnetu, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::obliczCeneKarnetu);
+
+    // === TABELA KARNETÓW ===
+    connect(ui->tableWidgetKarnety, &QTableWidget::itemSelectionChanged, this, &MainWindow::karnetWybrany);
 }
 
 void MainWindow::setupTableKlienci() {
@@ -1128,4 +1156,436 @@ void MainWindow::pokazKomunikat(const QString& tytul, const QString& tresc, QMes
     msgBox.setText(tresc);
     msgBox.setIcon(typ);
     msgBox.exec();
+}
+
+// ==================== SLOTS DLA KARNETÓW ====================
+
+void MainWindow::dodajKarnet() {
+    if (!walidujFormularzKarnetu()) {
+        return;
+    }
+
+    Karnet karnet = pobierzDaneKarnetuZFormularza();
+
+    bool sukces = DatabaseManager::addKarnet(
+        karnet.idKlienta,
+        karnet.typ,
+        karnet.dataRozpoczecia,
+        karnet.dataZakonczenia,
+        karnet.cena,
+        karnet.czyAktywny
+        );
+
+    if (sukces) {
+        pokazKomunikat("Sukces", "Karnet został dodany pomyślnie!", QMessageBox::Information);
+        wyczyscFormularzKarnetu();
+        odswiezListeKarnetow();
+        ui->statusbar->showMessage("Dodano nowy karnet", 3000);
+    } else {
+        pokazKomunikat("Błąd", "Nie udało się dodać karnetu.\nSprawdź czy klient nie ma już aktywnego karnetu tego typu.", QMessageBox::Warning);
+    }
+}
+
+void MainWindow::edytujKarnet() {
+    if (aktualnieEdytowanyKarnetId <= 0) {
+        pokazKomunikat("Błąd", "Nie wybrano karnetu do edycji.", QMessageBox::Warning);
+        return;
+    }
+
+    if (!walidujFormularzKarnetu()) {
+        return;
+    }
+
+    Karnet karnet = pobierzDaneKarnetuZFormularza();
+
+    bool sukces = DatabaseManager::updateKarnet(
+        aktualnieEdytowanyKarnetId,
+        karnet.idKlienta,
+        karnet.typ,
+        karnet.dataRozpoczecia,
+        karnet.dataZakonczenia,
+        karnet.cena,
+        karnet.czyAktywny
+        );
+
+    if (sukces) {
+        pokazKomunikat("Sukces", "Dane karnetu zostały zaktualizowane!", QMessageBox::Information);
+        odswiezListeKarnetow();
+        ustawTrybDodawaniaKarnetu();
+        ui->statusbar->showMessage("Zaktualizowano dane karnetu", 3000);
+    } else {
+        pokazKomunikat("Błąd", "Nie udało się zaktualizować danych karnetu.", QMessageBox::Warning);
+    }
+}
+
+void MainWindow::usunKarnet() {
+    if (aktualnieEdytowanyKarnetId <= 0) {
+        pokazKomunikat("Błąd", "Nie wybrano karnetu do usunięcia.", QMessageBox::Warning);
+        return;
+    }
+
+    QMessageBox::StandardButton odpowiedz = QMessageBox::question(
+        this,
+        "Potwierdzenie",
+        QString("Czy na pewno chcesz usunąć karnet?\n\nTa operacja jest nieodwracalna!"),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+        );
+
+    if (odpowiedz != QMessageBox::Yes) {
+        return;
+    }
+
+    bool sukces = DatabaseManager::deleteKarnet(aktualnieEdytowanyKarnetId);
+
+    if (sukces) {
+        pokazKomunikat("Sukces", "Karnet został usunięty!", QMessageBox::Information);
+        wyczyscFormularzKarnetu();
+        odswiezListeKarnetow();
+        ustawTrybDodawaniaKarnetu();
+        ui->statusbar->showMessage("Usunięto karnet", 3000);
+    } else {
+        pokazKomunikat("Błąd", "Nie udało się usunąć karnetu.", QMessageBox::Critical);
+    }
+}
+
+void MainWindow::wyczyscFormularzKarnetu() {
+    ui->comboBoxKlientKarnetu->setCurrentIndex(-1);
+    ui->comboBoxTypKarnetu->setCurrentIndex(0);
+    ui->dateEditRozpocKarnetu->setDate(QDate::currentDate());
+    ui->dateEditZakonKarnetu->setDate(QDate::currentDate().addMonths(1));
+    ui->doubleSpinBoxCenaKarnetu->setValue(150.0);
+    ui->comboBoxStatusKarnetu->setCurrentIndex(0); // Aktywny
+
+    wyczyscInfoKlienta();
+    ustawTrybDodawaniaKarnetu();
+}
+
+void MainWindow::filtrujKarnety() {
+    QString typFilter = ui->comboBoxFilterTypKarnetu->currentText();
+    QString statusFilter = ui->comboBoxFilterStatusKarnetu->currentText();
+
+    QList<Karnet> wszystkieKarnety = DatabaseManager::getAllKarnety();
+    QList<Karnet> przefiltrowane;
+
+    for (const Karnet& k : wszystkieKarnety) {
+        bool pasuje = true;
+
+        // Filtr typu
+        if (typFilter == "Tylko normalne" && k.typ != "normalny") {
+            pasuje = false;
+        } else if (typFilter == "Tylko studenckie" && k.typ != "studencki") {
+            pasuje = false;
+        }
+
+        // Filtr statusu
+        if (statusFilter == "Tylko aktywne" && !k.czyAktywny) {
+            pasuje = false;
+        } else if (statusFilter == "Tylko nieaktywne" && k.czyAktywny) {
+            pasuje = false;
+        }
+
+        if (pasuje) {
+            przefiltrowane.append(k);
+        }
+    }
+
+    zaladujKarnetyDoTabeli(przefiltrowane);
+    ui->statusbar->showMessage(QString("Przefiltrowano do %1 karnetów").arg(przefiltrowane.size()), 3000);
+}
+
+void MainWindow::odswiezListeKarnetow() {
+    QList<Karnet> karnety = DatabaseManager::getAllKarnety();
+    zaladujKarnetyDoTabeli(karnety);
+    aktualizujLicznikKarnetow();
+    zaladujKlientowDoComboBoxKarnetu();
+    ui->statusbar->showMessage("Lista karnetów odświeżona", 2000);
+}
+
+void MainWindow::karnetWybrany() {
+    int aktualnyWiersz = ui->tableWidgetKarnety->currentRow();
+
+    if (aktualnyWiersz < 0) {
+        ustawTrybDodawaniaKarnetu();
+        return;
+    }
+
+    QTableWidgetItem* idItem = ui->tableWidgetKarnety->item(aktualnyWiersz, 0);
+    if (!idItem) {
+        return;
+    }
+
+    int karnetId = idItem->text().toInt();
+    Karnet karnet = DatabaseManager::getKarnetById(karnetId);
+
+    if (karnet.id > 0) {
+        zaladujKarnetDoFormularza(karnet);
+        ustawTrybEdycjiKarnetu();
+        aktualnieEdytowanyKarnetId = karnet.id;
+    }
+}
+
+void MainWindow::klientKarnetuWybrany() {
+    aktualizujInfoKlienta();
+}
+
+void MainWindow::pokazStatystykiKarnetow() {
+    QList<QPair<QString, int>> statystyki = DatabaseManager::getStatystykiKarnetow();
+    double przychody = DatabaseManager::getCalkowitePrzychodyZKarnetow();
+    int aktywne = DatabaseManager::getLiczbaAktywnychKarnetow();
+
+    QString tekst = "📊 Statystyki karnetów:\n\n";
+
+    tekst += QString("Aktywnych karnetów: %1\n").arg(aktywne);
+    tekst += QString("Łączne przychody: %.2f zł\n\n").arg(przychody);
+
+    if (!statystyki.isEmpty()) {
+        tekst += "Karnety wg typów:\n";
+        for (const auto& stat : statystyki) {
+            tekst += QString("• %1: %2 karnetów\n").arg(stat.first).arg(stat.second);
+        }
+    } else {
+        tekst += "Brak aktywnych karnetów.";
+    }
+
+    pokazKomunikat("Statystyki karnetów", tekst, QMessageBox::Information);
+}
+
+void MainWindow::pokazWygasajaceKarnety() {
+    QString dzisiaj = QDate::currentDate().toString("yyyy-MM-dd");
+    QString za30dni = QDate::currentDate().addDays(30).toString("yyyy-MM-dd");
+
+    QList<Karnet> wygasajace = DatabaseManager::getKarnetyWygasajace(dzisiaj, za30dni);
+
+    QString tekst = "⚠️ Karnety wygasające w ciągu 30 dni:\n\n";
+
+    if (wygasajace.isEmpty()) {
+        tekst += "Brak karnetów wygasających w najbliższym czasie.";
+    } else {
+        for (const Karnet& k : wygasajace) {
+            tekst += QString("• %1 %2 (%3)\n  Typ: %4, wygasa: %5\n\n")
+                         .arg(k.imieKlienta)
+                         .arg(k.nazwiskoKlienta)
+                         .arg(k.emailKlienta.isEmpty() ? "brak email" : k.emailKlienta)
+                         .arg(k.typ)
+                         .arg(k.dataZakonczenia);
+        }
+    }
+
+    pokazKomunikat("Wygasające karnety", tekst, QMessageBox::Warning);
+}
+
+// ==================== METODY POMOCNICZE - KARNETY ====================
+
+void MainWindow::setupTableKarnety() {
+    // Konfiguracja tabeli karnetów
+    ui->tableWidgetKarnety->setColumnCount(8);
+
+    QStringList headers = {"ID", "Klient", "Email", "Typ", "Data rozpoczęcia", "Data zakończenia", "Cena", "Status"};
+    ui->tableWidgetKarnety->setHorizontalHeaderLabels(headers);
+
+    // Ukryj kolumnę ID
+    ui->tableWidgetKarnety->setColumnHidden(0, true);
+
+    // Ustaw tryb zaznaczania całych wierszy
+    ui->tableWidgetKarnety->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableWidgetKarnety->setSelectionMode(QAbstractItemView::SingleSelection);
+
+    // Ustaw szerokości kolumn
+    QHeaderView* header = ui->tableWidgetKarnety->horizontalHeader();
+    header->setStretchLastSection(true);
+    header->resizeSection(1, 150); // Klient
+    header->resizeSection(2, 200); // Email
+    header->resizeSection(3, 100); // Typ
+    header->resizeSection(4, 120); // Data rozpoczęcia
+    header->resizeSection(5, 120); // Data zakończenia
+    header->resizeSection(6, 80);  // Cena
+}
+
+void MainWindow::zaladujKarnetyDoTabeli(const QList<Karnet>& karnety) {
+    ui->tableWidgetKarnety->setRowCount(karnety.size());
+
+    for (int i = 0; i < karnety.size(); ++i) {
+        const Karnet& k = karnety[i];
+
+        ui->tableWidgetKarnety->setItem(i, 0, new QTableWidgetItem(QString::number(k.id)));
+        ui->tableWidgetKarnety->setItem(i, 1, new QTableWidgetItem(QString("%1 %2").arg(k.imieKlienta).arg(k.nazwiskoKlienta)));
+        ui->tableWidgetKarnety->setItem(i, 2, new QTableWidgetItem(k.emailKlienta));
+        ui->tableWidgetKarnety->setItem(i, 3, new QTableWidgetItem(k.typ));
+        ui->tableWidgetKarnety->setItem(i, 4, new QTableWidgetItem(k.dataRozpoczecia));
+        ui->tableWidgetKarnety->setItem(i, 5, new QTableWidgetItem(k.dataZakonczenia));
+        ui->tableWidgetKarnety->setItem(i, 6, new QTableWidgetItem(QString("%1 zł").arg(k.cena, 0, 'f', 2)));
+
+        // Status z kolorowym tłem
+        QTableWidgetItem* statusItem = new QTableWidgetItem(k.czyAktywny ? "Aktywny" : "Nieaktywny");
+        if (k.czyAktywny) {
+            statusItem->setBackground(QBrush(QColor(144, 238, 144))); // Jasny zielony
+        } else {
+            statusItem->setBackground(QBrush(QColor(255, 182, 193))); // Jasny czerwony
+        }
+        ui->tableWidgetKarnety->setItem(i, 7, statusItem);
+    }
+}
+
+void MainWindow::zaladujKarnetDoFormularza(const Karnet& karnet) {
+    // Znajdź i ustaw klienta w ComboBox
+    for (int i = 0; i < ui->comboBoxKlientKarnetu->count(); i++) {
+        if (ui->comboBoxKlientKarnetu->itemData(i).toInt() == karnet.idKlienta) {
+            ui->comboBoxKlientKarnetu->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    // Ustaw typ karnetu
+    int typIndex = ui->comboBoxTypKarnetu->findText(karnet.typ);
+    if (typIndex >= 0) {
+        ui->comboBoxTypKarnetu->setCurrentIndex(typIndex);
+    }
+
+    // Ustaw daty
+    if (!karnet.dataRozpoczecia.isEmpty()) {
+        QDate dataRozp = QDate::fromString(karnet.dataRozpoczecia, "yyyy-MM-dd");
+        if (dataRozp.isValid()) {
+            ui->dateEditRozpocKarnetu->setDate(dataRozp);
+        }
+    }
+
+    if (!karnet.dataZakonczenia.isEmpty()) {
+        QDate dataZak = QDate::fromString(karnet.dataZakonczenia, "yyyy-MM-dd");
+        if (dataZak.isValid()) {
+            ui->dateEditZakonKarnetu->setDate(dataZak);
+        }
+    }
+
+    // Ustaw cenę
+    ui->doubleSpinBoxCenaKarnetu->setValue(karnet.cena);
+
+    // Ustaw status
+    ui->comboBoxStatusKarnetu->setCurrentIndex(karnet.czyAktywny ? 0 : 1);
+
+    // Aktualizuj informacje o kliencie
+    aktualizujInfoKlienta();
+}
+
+void MainWindow::zaladujKlientowDoComboBoxKarnetu() {
+    ui->comboBoxKlientKarnetu->clear();
+
+    QList<Klient> klienci = DatabaseManager::getAllKlienci();
+    for (const Klient& k : klienci) {
+        QString tekst = QString("%1 %2").arg(k.imie).arg(k.nazwisko);
+        if (!k.email.isEmpty()) {
+            tekst += QString(" (%1)").arg(k.email);
+        }
+        ui->comboBoxKlientKarnetu->addItem(tekst, k.id);
+    }
+
+    ui->comboBoxKlientKarnetu->setCurrentIndex(-1); // Nic nie wybrane
+}
+
+Karnet MainWindow::pobierzDaneKarnetuZFormularza() {
+    Karnet karnet = {};
+
+    karnet.idKlienta = ui->comboBoxKlientKarnetu->currentData().toInt();
+    karnet.typ = ui->comboBoxTypKarnetu->currentText();
+    karnet.dataRozpoczecia = ui->dateEditRozpocKarnetu->date().toString("yyyy-MM-dd");
+    karnet.dataZakonczenia = ui->dateEditZakonKarnetu->date().toString("yyyy-MM-dd");
+    karnet.cena = ui->doubleSpinBoxCenaKarnetu->value();
+    karnet.czyAktywny = (ui->comboBoxStatusKarnetu->currentIndex() == 0);
+
+    return karnet;
+}
+
+bool MainWindow::walidujFormularzKarnetu() {
+    QString bledy = "";
+
+    if (ui->comboBoxKlientKarnetu->currentIndex() < 0) {
+        bledy += "• Wybierz klienta\n";
+    }
+
+    if (ui->dateEditRozpocKarnetu->date() >= ui->dateEditZakonKarnetu->date()) {
+        bledy += "• Data zakończenia musi być późniejsza niż data rozpoczęcia\n";
+    }
+
+    if (ui->doubleSpinBoxCenaKarnetu->value() <= 0) {
+        bledy += "• Cena musi być większa od zera\n";
+    }
+
+    if (!bledy.isEmpty()) {
+        pokazKomunikat("Błąd walidacji", "Formularz zawiera błędy:\n\n" + bledy, QMessageBox::Warning);
+        return false;
+    }
+
+    return true;
+}
+
+void MainWindow::ustawTrybDodawaniaKarnetu() {
+    aktualnieEdytowanyKarnetId = -1;
+
+    ui->pushButtonDodajKarnet->setEnabled(true);
+    ui->pushButtonEdytujKarnet->setEnabled(false);
+    ui->pushButtonUsunKarnet->setEnabled(false);
+
+    ui->labelFormularzKarnetuTitle->setText("Dodaj nowy karnet");
+
+    ui->tableWidgetKarnety->clearSelection();
+}
+
+void MainWindow::ustawTrybEdycjiKarnetu() {
+    ui->pushButtonDodajKarnet->setEnabled(false);
+    ui->pushButtonEdytujKarnet->setEnabled(true);
+    ui->pushButtonUsunKarnet->setEnabled(true);
+
+    ui->labelFormularzKarnetuTitle->setText("Edytuj karnet");
+}
+
+void MainWindow::aktualizujLicznikKarnetow() {
+    int liczba = DatabaseManager::getKarnetyCount();
+    ui->labelLiczbaKarnetow->setText(QString("Liczba karnetów: %1").arg(liczba));
+}
+
+void MainWindow::aktualizujInfoKlienta() {
+    int klientId = ui->comboBoxKlientKarnetu->currentData().toInt();
+
+    if (klientId <= 0) {
+        wyczyscInfoKlienta();
+        return;
+    }
+
+    Klient klient = DatabaseManager::getKlientById(klientId);
+    if (klient.id <= 0) {
+        wyczyscInfoKlienta();
+        return;
+    }
+
+    QList<Karnet> aktywneKarnety = DatabaseManager::getAktywneKarnetyKlienta(klientId);
+
+    ui->labelInfoImieNazwisko->setText(QString("Klient: %1 %2").arg(klient.imie).arg(klient.nazwisko));
+    ui->labelInfoEmailKlient->setText(QString("Email: %1").arg(klient.email.isEmpty() ? "Brak" : klient.email));
+    ui->labelInfoAktywneKarnety->setText(QString("Aktywne karnety: %1").arg(aktywneKarnety.size()));
+
+    // Zmień kolor w zależności od liczby karnetów
+    if (aktywneKarnety.size() > 1) {
+        ui->labelInfoAktywneKarnety->setStyleSheet("color: orange; font-weight: bold;");
+    } else if (aktywneKarnety.size() == 1) {
+        ui->labelInfoAktywneKarnety->setStyleSheet("color: green; font-weight: bold;");
+    } else {
+        ui->labelInfoAktywneKarnety->setStyleSheet("color: gray; font-weight: bold;");
+    }
+}
+
+void MainWindow::wyczyscInfoKlienta() {
+    ui->labelInfoImieNazwisko->setText("Klient: -");
+    ui->labelInfoEmailKlient->setText("Email: -");
+    ui->labelInfoAktywneKarnety->setText("Aktywne karnety: -");
+    ui->labelInfoAktywneKarnety->setStyleSheet(""); // Usuń kolorowanie
+}
+
+void MainWindow::obliczCeneKarnetu() {
+    QString typ = ui->comboBoxTypKarnetu->currentText();
+
+    if (typ == "normalny") {
+        ui->doubleSpinBoxCenaKarnetu->setValue(150.0);
+    } else if (typ == "studencki") {
+        ui->doubleSpinBoxCenaKarnetu->setValue(100.0);
+    }
 }
