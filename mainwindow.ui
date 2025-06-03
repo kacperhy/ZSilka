@@ -6,25 +6,429 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>1200</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Zarządzanie Siłownią</string>
   </property>
-  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout_main">
+    <item>
+     <!-- LEWA STRONA - LISTA KLIENTÓW -->
+     <widget class="QWidget" name="leftPanel" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>600</width>
+        <height>0</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_left">
+       <item>
+        <widget class="QLabel" name="labelKlienciTitle">
+         <property name="text">
+          <string>Lista Klientów</string>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>14</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+        </widget>
+       </item>
+
+       <!-- Wyszukiwanie -->
+       <item>
+        <layout class="QHBoxLayout" name="searchLayout">
+         <item>
+          <widget class="QLabel" name="labelSearch">
+           <property name="text">
+            <string>Szukaj po nazwisku:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEditSearch">
+           <property name="placeholderText">
+            <string>Wpisz nazwisko...</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonSearch">
+           <property name="text">
+            <string>Szukaj</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonShowAll">
+           <property name="text">
+            <string>Pokaż wszystkich</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+
+       <!-- Tabela z klientami -->
+       <item>
+        <widget class="QTableWidget" name="tableWidgetKlienci">
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+         <property name="selectionBehavior">
+          <enum>QAbstractItemView::SelectRows</enum>
+         </property>
+         <property name="sortingEnabled">
+          <bool>true</bool>
+         </property>
+         <column>
+          <property name="text">
+           <string>ID</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Imię</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Nazwisko</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Email</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Telefon</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Data urodzenia</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Data rejestracji</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+
+       <!-- Przyciski akcji -->
+       <item>
+        <layout class="QHBoxLayout" name="buttonsLayout">
+         <item>
+          <widget class="QPushButton" name="pushButtonOdswiez">
+           <property name="text">
+            <string>Odśwież listę</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelLiczbaKlientow">
+           <property name="text">
+            <string>Liczba klientów: 0</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+
+    <item>
+     <!-- PRAWA STRONA - FORMULARZ -->
+     <widget class="QWidget" name="rightPanel" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>400</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>500</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_right">
+       <item>
+        <widget class="QLabel" name="labelFormularzTitle">
+         <property name="text">
+          <string>Formularz Klienta</string>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>14</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+        </widget>
+       </item>
+
+       <!-- Formularz -->
+       <item>
+        <widget class="QGroupBox" name="groupBoxFormularz">
+         <property name="title">
+          <string>Dane klienta</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="labelImie">
+            <property name="text">
+             <string>Imię *:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="lineEditImie">
+            <property name="placeholderText">
+             <string>Wprowadź imię</string>
+            </property>
+           </widget>
+          </item>
+
+          <item row="1" column="0">
+           <widget class="QLabel" name="labelNazwisko">
+            <property name="text">
+             <string>Nazwisko *:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="lineEditNazwisko">
+            <property name="placeholderText">
+             <string>Wprowadź nazwisko</string>
+            </property>
+           </widget>
+          </item>
+
+          <item row="2" column="0">
+           <widget class="QLabel" name="labelEmail">
+            <property name="text">
+             <string>Email:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="lineEditEmail">
+            <property name="placeholderText">
+             <string>przykład@email.com</string>
+            </property>
+           </widget>
+          </item>
+
+          <item row="3" column="0">
+           <widget class="QLabel" name="labelTelefon">
+            <property name="text">
+             <string>Telefon:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="lineEditTelefon">
+            <property name="placeholderText">
+             <string>123-456-789</string>
+            </property>
+           </widget>
+          </item>
+
+          <item row="4" column="0">
+           <widget class="QLabel" name="labelDataUrodzenia">
+            <property name="text">
+             <string>Data urodzenia:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QDateEdit" name="dateEditUrodzenia">
+            <property name="displayFormat">
+             <string>yyyy-MM-dd</string>
+            </property>
+            <property name="calendarPopup">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+
+          <item row="5" column="0">
+           <widget class="QLabel" name="labelUwagi">
+            <property name="text">
+             <string>Uwagi:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QTextEdit" name="textEditUwagi">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>80</height>
+             </size>
+            </property>
+            <property name="placeholderText">
+             <string>Dodatkowe informacje o kliencie...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+
+       <!-- Przyciski formularza -->
+       <item>
+        <layout class="QHBoxLayout" name="formButtonsLayout">
+         <item>
+          <widget class="QPushButton" name="pushButtonDodaj">
+           <property name="text">
+            <string>Dodaj klienta</string>
+           </property>
+           <property name="default">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonEdytuj">
+           <property name="text">
+            <string>Zapisz zmiany</string>
+           </property>
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+
+       <item>
+        <layout class="QHBoxLayout" name="formButtonsLayout2">
+         <item>
+          <widget class="QPushButton" name="pushButtonUsun">
+           <property name="text">
+            <string>Usuń klienta</string>
+           </property>
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonWyczysc">
+           <property name="text">
+            <string>Wyczyść formularz</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+
+       <!-- Informacja o wymaganych polach -->
+       <item>
+        <widget class="QLabel" name="labelWymagane">
+         <property name="text">
+          <string>* - pola wymagane</string>
+         </property>
+         <property name="font">
+          <font>
+           <italic>true</italic>
+          </font>
+         </property>
+        </widget>
+       </item>
+
+       <!-- Spacer żeby formularz był na górze -->
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+
+  <!-- Status bar -->
+  <widget class="QStatusBar" name="statusbar">
+   <property name="sizeGripEnabled">
+    <bool>false</bool>
+   </property>
+  </widget>
+
+  <!-- Menu bar -->
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
-     <height>21</height>
+     <width>1200</width>
+     <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuPlik">
+    <property name="title">
+     <string>Plik</string>
+    </property>
+    <addaction name="actionZamknij"/>
+   </widget>
+   <widget class="QMenu" name="menuPomoc">
+    <property name="title">
+     <string>Pomoc</string>
+    </property>
+    <addaction name="actionOProgramie"/>
+   </widget>
+   <addaction name="menuPlik"/>
+   <addaction name="menuPomoc"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+
+  <!-- Actions -->
+  <action name="actionZamknij">
+   <property name="text">
+    <string>Zamknij</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionOProgramie">
+   <property name="text">
+    <string>O programie</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
