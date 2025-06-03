@@ -59,6 +59,53 @@ void MainWindow::createTablesIfNotExist() {
     )")) {
         qWarning() << "Błąd tworzenia tabeli 'klient':" << query.lastError().text();
     }
+
+    // 2) Tabela zajęć
+    if (!query.exec(R"(
+        CREATE TABLE IF NOT EXISTS zajecia (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            nazwa             TEXT    NOT NULL,
+            trener            TEXT,
+            maksUczestnikow   INTEGER,
+            data              TEXT,   -- w formacie 'YYYY-MM-DD'
+            czas              TEXT,   -- np. 'HH:MM'
+            czasTrwania       INTEGER, -- w minutach
+            opis              TEXT
+        )
+    )")) {
+        qWarning() << "Błąd tworzenia tabeli 'zajecia':" << query.lastError().text();
+    }
+
+    // 3) Tabela karnetów (powiązana z klientem przez idKlienta)
+    if (!query.exec(R"(
+        CREATE TABLE IF NOT EXISTS karnet (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            idKlienta        INTEGER    NOT NULL,
+            typ              TEXT,
+            dataRozpoczecia  TEXT,
+            dataZakonczenia  TEXT,
+            cena             REAL,
+            czyAktywny       INTEGER,   -- 0 lub 1
+            FOREIGN KEY(idKlienta) REFERENCES klient(id)
+        )
+    )")) {
+        qWarning() << "Błąd tworzenia tabeli 'karnet':" << query.lastError().text();
+    }
+
+    // 4) Tabela rezerwacji (powiązana z klientem i zajęciami)
+    if (!query.exec(R"(
+        CREATE TABLE IF NOT EXISTS rezerwacja (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            idKlienta        INTEGER    NOT NULL,
+            idZajec          INTEGER    NOT NULL,
+            dataRezerwacji   TEXT,      -- format 'YYYY-MM-DD HH:MM:SS'
+            status           TEXT,
+            FOREIGN KEY(idKlienta) REFERENCES klient(id),
+            FOREIGN KEY(idZajec)   REFERENCES zajecia(id)
+        )
+    )")) {
+        qWarning() << "Błąd tworzenia tabeli 'rezerwacja':" << query.lastError().text();
+    }
 }
 
 // ==================== SLOTS DLA REZERWACJI ====================
@@ -218,54 +265,6 @@ void MainWindow::pokazAktywnychKlientow() {
     }
 
     pokazKomunikat("Najaktywniejszi klienci", tekst, QMessageBox::Information);
-
-    // 2) Tabela zajęć
-    if (!query.exec(R"(
-        CREATE TABLE IF NOT EXISTS zajecia (
-            id                INTEGER PRIMARY KEY AUTOINCREMENT,
-            nazwa             TEXT    NOT NULL,
-            trener            TEXT,
-            maksUczestnikow   INTEGER,
-            data              TEXT,   -- w formacie 'YYYY-MM-DD'
-            czas              TEXT,   -- np. 'HH:MM'
-            czasTrwania       INTEGER, -- w minutach
-            opis              TEXT
-        )
-    )")) {
-        qWarning() << "Błąd tworzenia tabeli 'zajecia':" << query.lastError().text();
-    }
-
-    // 3) Tabela karnetów (powiązana z klientem przez idKlienta)
-    if (!query.exec(R"(
-        CREATE TABLE IF NOT EXISTS karnet (
-            id               INTEGER PRIMARY KEY AUTOINCREMENT,
-            idKlienta        INTEGER    NOT NULL,
-            typ              TEXT,
-            dataRozpoczecia  TEXT,
-            dataZakonczenia  TEXT,
-            cena             REAL,
-            czyAktywny       INTEGER,   -- 0 lub 1
-            FOREIGN KEY(idKlienta) REFERENCES klient(id)
-        )
-    )")) {
-        qWarning() << "Błąd tworzenia tabeli 'karnet':" << query.lastError().text();
-    }
-
-    // 4) Tabela rezerwacji (powiązana z klientem i zajęciami)
-    if (!query.exec(R"(
-        CREATE TABLE IF NOT EXISTS rezerwacja (
-            id               INTEGER PRIMARY KEY AUTOINCREMENT,
-            idKlienta        INTEGER    NOT NULL,
-            idZajec          INTEGER    NOT NULL,
-            dataRezerwacji   TEXT,      -- format 'YYYY-MM-DD HH:MM:SS'
-            status           TEXT,
-            FOREIGN KEY(idKlienta) REFERENCES klient(id),
-            FOREIGN KEY(idZajec)   REFERENCES zajecia(id)
-        )
-    )")) {
-        qWarning() << "Błąd tworzenia tabeli 'rezerwacja':" << query.lastError().text();
-    }
-}
 }
 
 // ==================== SETUP METODY ====================
@@ -767,11 +766,6 @@ void MainWindow::oProgramie() {
                        "• Wyszukiwanie i filtrowanie danych\n"
                        "• Statystyki najpopularniejszych zajęć\n"
                        "• Raporty najaktywniejszych klientów\n\n"
-                       "Nowe w v3.0:\n"
-                       "• Pełny system rezerwacji\n"
-                       "• Kontrola limitów uczestników\n"
-                       "• Kolorowe statusy rezerwacji\n"
-                       "• Statystyki i raporty\n\n"
                        "Technologia: Qt + SQLite"
                        );
 }
@@ -1124,7 +1118,6 @@ void MainWindow::aktualizujPrzyciskAnuluj() {
     } else {
         ui->pushButtonAnulujRezerwacje->setText("Anuluj rezerwację");
     }
-}
 }
 
 // ==================== METODY OGÓLNE ====================
