@@ -43,7 +43,6 @@ bool DatabaseManager::addKlient(const QString& imie,
                                 const QString& dataUrodzenia,
                                 const QString& uwagi) {
 
-    // Sprawdź czy email już istnieje (jeśli podano)
     if (!email.isEmpty() && emailExists(email)) {
         qWarning() << "Email już istnieje w bazie:" << email;
         return false;
@@ -89,7 +88,7 @@ QList<Klient> DatabaseManager::getAllKlienci() {
 }
 
 Klient DatabaseManager::getKlientById(int id) {
-    Klient klient = {}; // pusty klient
+    Klient klient = {};
 
     QSqlQuery query(db);
     query.prepare("SELECT id, imie, nazwisko, email, telefon, dataUrodzenia, dataRejestracji, uwagi FROM klient WHERE id = :id");
@@ -115,7 +114,6 @@ bool DatabaseManager::updateKlient(int id,
                                    const QString& dataUrodzenia,
                                    const QString& uwagi) {
 
-    // Sprawdź czy email już istnieje u innego klienta
     if (!email.isEmpty() && emailExists(email, id)) {
         qWarning() << "Email już istnieje u innego klienta:" << email;
         return false;
@@ -233,7 +231,6 @@ bool DatabaseManager::addZajecia(const QString& nazwa,
                                  int czasTrwania,
                                  const QString& opis) {
 
-    // Sprawdź czy zajęcia o tej nazwie, dacie i czasie już istnieją
     if (!data.isEmpty() && !czas.isEmpty() && zajeciaExist(nazwa, data, czas)) {
         qWarning() << "Zajęcia o tej nazwie, dacie i czasie już istnieją:" << nazwa << data << czas;
         return false;
@@ -279,7 +276,7 @@ QList<Zajecia> DatabaseManager::getAllZajecia() {
 }
 
 Zajecia DatabaseManager::getZajeciaById(int id) {
-    Zajecia zajecia = {}; // puste zajęcia
+    Zajecia zajecia = {};
 
     QSqlQuery query(db);
     query.prepare("SELECT id, nazwa, trener, maksUczestnikow, data, czas, czasTrwania, opis FROM zajecia WHERE id = :id");
@@ -306,7 +303,6 @@ bool DatabaseManager::updateZajecia(int id,
                                     int czasTrwania,
                                     const QString& opis) {
 
-    // Sprawdź czy zajęcia o tej nazwie, dacie i czasie już istnieją (z wykluczeniem aktualnych)
     if (!data.isEmpty() && !czas.isEmpty() && zajeciaExist(nazwa, data, czas, id)) {
         qWarning() << "Zajęcia o tej nazwie, dacie i czasie już istnieją:" << nazwa << data << czas;
         return false;
@@ -361,8 +357,6 @@ bool DatabaseManager::deleteZajecia(int id) {
     qDebug() << "Usunięto zajęcia o ID:" << id;
     return true;
 }
-
-// === Pomocnicze metody dla zajęć ===
 
 QList<Zajecia> DatabaseManager::searchZajeciaByNazwa(const QString& nazwa) {
     QList<Zajecia> zajecia;
@@ -457,6 +451,329 @@ bool DatabaseManager::zajeciaExist(const QString& nazwa, const QString& data, co
     return query.value(0).toInt() > 0;
 }
 
+// === CRUD dla REZERWACJI ===
+
+bool DatabaseManager::addRezerwacja(int idKlienta, int idZajec, const QString& status) {
+    // Sprawdź czy klient już ma rezerwację na te zajęcia
+    if (klientMaRezerwacje(idKlienta, idZajec)) {
+        qWarning() << "Klient już ma rezerwację na te zajęcia. Klient ID:" << idKlienta << "Zajęcia ID:" << idZajec;
+        return false;
+    }
+
+    // Sprawdź czy można zarezerwować (czy nie przekroczono limitu)
+    if (!moznaZarezerwowac(idZajec)) {
+        qWarning() << "Przekroczono limit uczestników dla zajęć ID:" << idZajec;
+        return false;
+    }
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        INSERT INTO rezerwacja (idKlienta, idZajec, dataRezerwacji, status)
+        VALUES (:idKlienta, :idZajec, :dataRezerwacji, :status)
+    )");
+
+    query.bindValue(":idKlienta", idKlienta);
+    query.bindValue(":idZajec", idZajec);
+    query.bindValue(":dataRezerwacji", QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+    query.bindValue(":status", status);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd dodawania rezerwacji:" << query.lastError().text();
+        return false;
+    }
+
+    qDebug() << "Dodano rezerwację: klient" << idKlienta << "na zajęcia" << idZajec;
+    return true;
+}
+
+QList<Rezerwacja> DatabaseManager::getAllRezerwacje() {
+    QList<Rezerwacja> rezerwacje;
+
+    QSqlQuery query(db);
+    if (!query.exec(R"(
+        SELECT r.id, r.idKlienta, r.idZajec, r.dataRezerwacji, r.status,
+               k.imie, k.nazwisko,
+               z.nazwa, z.trener, z.data, z.czas
+        FROM rezerwacja r
+        JOIN klient k ON r.idKlienta = k.id
+        JOIN zajecia z ON r.idZajec = z.id
+        ORDER BY r.dataRezerwacji DESC
+    )")) {
+        qWarning() << "Błąd pobierania rezerwacji:" << query.lastError().text();
+        return rezerwacje;
+    }
+
+    while (query.next()) {
+        rezerwacje.append(queryToRezerwacja(query));
+    }
+
+    return rezerwacje;
+}
+
+Rezerwacja DatabaseManager::getRezerwacjaById(int id) {
+    Rezerwacja rezerwacja = {};
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT r.id, r.idKlienta, r.idZajec, r.dataRezerwacji, r.status,
+               k.imie, k.nazwisko,
+               z.nazwa, z.trener, z.data, z.czas
+        FROM rezerwacja r
+        JOIN klient k ON r.idKlienta = k.id
+        JOIN zajecia z ON r.idZajec = z.id
+        WHERE r.id = :id
+    )");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania rezerwacji o ID" << id << ":" << query.lastError().text();
+        return rezerwacja;
+    }
+
+    if (query.next()) {
+        rezerwacja = queryToRezerwacja(query);
+    }
+
+    return rezerwacja;
+}
+
+bool DatabaseManager::updateRezerwacjaStatus(int id, const QString& status) {
+    QSqlQuery query(db);
+    query.prepare("UPDATE rezerwacja SET status = :status WHERE id = :id");
+    query.bindValue(":id", id);
+    query.bindValue(":status", status);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd aktualizacji statusu rezerwacji:" << query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        qWarning() << "Nie znaleziono rezerwacji o ID:" << id;
+        return false;
+    }
+
+    qDebug() << "Zaktualizowano status rezerwacji o ID:" << id << "na:" << status;
+    return true;
+}
+
+bool DatabaseManager::deleteRezerwacja(int id) {
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM rezerwacja WHERE id = :id");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd usuwania rezerwacji:" << query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        qWarning() << "Nie znaleziono rezerwacji o ID:" << id;
+        return false;
+    }
+
+    qDebug() << "Usunięto rezerwację o ID:" << id;
+    return true;
+}
+
+// === Pomocnicze metody dla rezerwacji ===
+
+bool DatabaseManager::klientMaRezerwacje(int idKlienta, int idZajec) {
+    QSqlQuery query(db);
+    query.prepare("SELECT COUNT(*) FROM rezerwacja WHERE idKlienta = :idKlienta AND idZajec = :idZajec AND status = 'aktywna'");
+    query.bindValue(":idKlienta", idKlienta);
+    query.bindValue(":idZajec", idZajec);
+
+    if (!query.exec() || !query.next()) {
+        qWarning() << "Błąd sprawdzania rezerwacji klienta:" << query.lastError().text();
+        return false;
+    }
+
+    return query.value(0).toInt() > 0;
+}
+
+int DatabaseManager::getIloscAktywnychRezerwacji(int idZajec) {
+    QSqlQuery query(db);
+    query.prepare("SELECT COUNT(*) FROM rezerwacja WHERE idZajec = :idZajec AND status = 'aktywna'");
+    query.bindValue(":idZajec", idZajec);
+
+    if (!query.exec() || !query.next()) {
+        qWarning() << "Błąd liczenia aktywnych rezerwacji:" << query.lastError().text();
+        return 0;
+    }
+
+    return query.value(0).toInt();
+}
+
+bool DatabaseManager::moznaZarezerwowac(int idZajec) {
+    // Pobierz limit uczestników dla zajęć
+    QSqlQuery query(db);
+    query.prepare("SELECT maksUczestnikow FROM zajecia WHERE id = :id");
+    query.bindValue(":id", idZajec);
+
+    if (!query.exec() || !query.next()) {
+        qWarning() << "Błąd pobierania limitu zajęć:" << query.lastError().text();
+        return false;
+    }
+
+    int limit = query.value(0).toInt();
+    int aktualne = getIloscAktywnychRezerwacji(idZajec);
+
+    return aktualne < limit;
+}
+
+QList<Rezerwacja> DatabaseManager::getRezerwacjeKlienta(int idKlienta) {
+    QList<Rezerwacja> rezerwacje;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT r.id, r.idKlienta, r.idZajec, r.dataRezerwacji, r.status,
+               k.imie, k.nazwisko,
+               z.nazwa, z.trener, z.data, z.czas
+        FROM rezerwacja r
+        JOIN klient k ON r.idKlienta = k.id
+        JOIN zajecia z ON r.idZajec = z.id
+        WHERE r.idKlienta = :idKlienta
+        ORDER BY z.data, z.czas
+    )");
+    query.bindValue(":idKlienta", idKlienta);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania rezerwacji klienta:" << query.lastError().text();
+        return rezerwacje;
+    }
+
+    while (query.next()) {
+        rezerwacje.append(queryToRezerwacja(query));
+    }
+
+    return rezerwacje;
+}
+
+QList<Rezerwacja> DatabaseManager::getRezerwacjeZajec(int idZajec) {
+    QList<Rezerwacja> rezerwacje;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT r.id, r.idKlienta, r.idZajec, r.dataRezerwacji, r.status,
+               k.imie, k.nazwisko,
+               z.nazwa, z.trener, z.data, z.czas
+        FROM rezerwacja r
+        JOIN klient k ON r.idKlienta = k.id
+        JOIN zajecia z ON r.idZajec = z.id
+        WHERE r.idZajec = :idZajec AND r.status = 'aktywna'
+        ORDER BY k.nazwisko, k.imie
+    )");
+    query.bindValue(":idZajec", idZajec);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania rezerwacji zajęć:" << query.lastError().text();
+        return rezerwacje;
+    }
+
+    while (query.next()) {
+        rezerwacje.append(queryToRezerwacja(query));
+    }
+
+    return rezerwacje;
+}
+
+QList<Zajecia> DatabaseManager::getZajeciaDostepneDoRezerwacji() {
+    QList<Zajecia> zajecia;
+
+    QSqlQuery query(db);
+    if (!query.exec(R"(
+        SELECT z.id, z.nazwa, z.trener, z.maksUczestnikow, z.data, z.czas, z.czasTrwania, z.opis,
+               COUNT(r.id) as aktualne_rezerwacje
+        FROM zajecia z
+        LEFT JOIN rezerwacja r ON z.id = r.idZajec AND r.status = 'aktywna'
+        GROUP BY z.id, z.nazwa, z.trener, z.maksUczestnikow, z.data, z.czas, z.czasTrwania, z.opis
+        HAVING COUNT(r.id) < z.maksUczestnikow
+        ORDER BY z.data, z.czas
+    )")) {
+        qWarning() << "Błąd pobierania dostępnych zajęć:" << query.lastError().text();
+        return zajecia;
+    }
+
+    while (query.next()) {
+        zajecia.append(queryToZajecia(query));
+    }
+
+    return zajecia;
+}
+
+int DatabaseManager::getRezerwacjeCount() {
+    QSqlQuery query(db);
+    if (!query.exec("SELECT COUNT(*) FROM rezerwacja")) {
+        qWarning() << "Błąd liczenia rezerwacji:" << query.lastError().text();
+        return 0;
+    }
+
+    if (query.next()) {
+        return query.value(0).toInt();
+    }
+
+    return 0;
+}
+
+// === Metody raportowe ===
+
+QList<QPair<QString, int>> DatabaseManager::getNajpopularniejszeZajecia(int limit) {
+    QList<QPair<QString, int>> wyniki;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT z.nazwa, COUNT(r.id) as liczba_rezerwacji
+        FROM zajecia z
+        LEFT JOIN rezerwacja r ON z.id = r.idZajec AND r.status = 'aktywna'
+        GROUP BY z.id, z.nazwa
+        ORDER BY liczba_rezerwacji DESC, z.nazwa
+        LIMIT :limit
+    )");
+    query.bindValue(":limit", limit);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania najpopularniejszych zajęć:" << query.lastError().text();
+        return wyniki;
+    }
+
+    while (query.next()) {
+        QString nazwa = query.value("nazwa").toString();
+        int liczba = query.value("liczba_rezerwacji").toInt();
+        wyniki.append(qMakePair(nazwa, liczba));
+    }
+
+    return wyniki;
+}
+
+QList<QPair<QString, int>> DatabaseManager::getNajaktywniejszychKlientow(int limit) {
+    QList<QPair<QString, int>> wyniki;
+
+    QSqlQuery query(db);
+    query.prepare(R"(
+        SELECT k.imie || ' ' || k.nazwisko as pelne_imie, COUNT(r.id) as liczba_rezerwacji
+        FROM klient k
+        LEFT JOIN rezerwacja r ON k.id = r.idKlienta AND r.status = 'aktywna'
+        GROUP BY k.id, k.imie, k.nazwisko
+        ORDER BY liczba_rezerwacji DESC, k.nazwisko, k.imie
+        LIMIT :limit
+    )");
+    query.bindValue(":limit", limit);
+
+    if (!query.exec()) {
+        qWarning() << "Błąd pobierania najaktywniejszych klientów:" << query.lastError().text();
+        return wyniki;
+    }
+
+    while (query.next()) {
+        QString nazwa = query.value("pelne_imie").toString();
+        int liczba = query.value("liczba_rezerwacji").toInt();
+        wyniki.append(qMakePair(nazwa, liczba));
+    }
+
+    return wyniki;
+}
+
 // === Metody pomocnicze ===
 
 Klient DatabaseManager::queryToKlient(QSqlQuery& query) {
@@ -483,4 +800,23 @@ Zajecia DatabaseManager::queryToZajecia(QSqlQuery& query) {
     zajecia.czasTrwania = query.value("czasTrwania").toInt();
     zajecia.opis = query.value("opis").toString();
     return zajecia;
+}
+
+Rezerwacja DatabaseManager::queryToRezerwacja(QSqlQuery& query) {
+    Rezerwacja rezerwacja;
+    rezerwacja.id = query.value("id").toInt();
+    rezerwacja.idKlienta = query.value("idKlienta").toInt();
+    rezerwacja.idZajec = query.value("idZajec").toInt();
+    rezerwacja.dataRezerwacji = query.value("dataRezerwacji").toString();
+    rezerwacja.status = query.value("status").toString();
+
+    // Informacje z joinów
+    rezerwacja.imieKlienta = query.value("imie").toString();
+    rezerwacja.nazwiskoKlienta = query.value("nazwisko").toString();
+    rezerwacja.nazwaZajec = query.value("nazwa").toString();
+    rezerwacja.trenerZajec = query.value("trener").toString();
+    rezerwacja.dataZajec = query.value("data").toString();
+    rezerwacja.czasZajec = query.value("czas").toString();
+
+    return rezerwacja;
 }

@@ -27,6 +27,22 @@ struct Zajecia {
     QString opis;
 };
 
+struct Rezerwacja {
+    int id;
+    int idKlienta;
+    int idZajec;
+    QString dataRezerwacji; // format YYYY-MM-DD HH:MM:SS
+    QString status;         // "aktywna", "anulowana", itp.
+
+    // Dodatkowe informacje (z joinów)
+    QString imieKlienta;
+    QString nazwiskoKlienta;
+    QString nazwaZajec;
+    QString trenerZajec;
+    QString dataZajec;
+    QString czasZajec;
+};
+
 class DatabaseManager {
 public:
     // === Podstawowe metody połączenia ===
@@ -35,22 +51,14 @@ public:
     static QSqlDatabase& instance();
 
     // === CRUD dla KLIENTÓW ===
-
-    // Dodawanie nowego klienta
     static bool addKlient(const QString& imie,
                           const QString& nazwisko,
                           const QString& email = QString(),
                           const QString& telefon = QString(),
                           const QString& dataUrodzenia = QString(),
                           const QString& uwagi = QString());
-
-    // Pobieranie wszystkich klientów
     static QList<Klient> getAllKlienci();
-
-    // Pobieranie klienta po ID
     static Klient getKlientById(int id);
-
-    // Aktualizacja danych klienta
     static bool updateKlient(int id,
                              const QString& imie,
                              const QString& nazwisko,
@@ -58,22 +66,12 @@ public:
                              const QString& telefon = QString(),
                              const QString& dataUrodzenia = QString(),
                              const QString& uwagi = QString());
-
-    // Usuwanie klienta
     static bool deleteKlient(int id);
-
-    // Sprawdzanie czy email już istnieje
     static bool emailExists(const QString& email, int excludeId = -1);
-
-    // Wyszukiwanie klientów po nazwisku
     static QList<Klient> searchKlienciByNazwisko(const QString& nazwisko);
-
-    // Liczba wszystkich klientów
     static int getKlienciCount();
 
     // === CRUD dla ZAJĘĆ ===
-
-    // Dodawanie nowych zajęć
     static bool addZajecia(const QString& nazwa,
                            const QString& trener = QString(),
                            int maksUczestnikow = 20,
@@ -81,14 +79,8 @@ public:
                            const QString& czas = QString(),
                            int czasTrwania = 60,
                            const QString& opis = QString());
-
-    // Pobieranie wszystkich zajęć
     static QList<Zajecia> getAllZajecia();
-
-    // Pobieranie zajęć po ID
     static Zajecia getZajeciaById(int id);
-
-    // Aktualizacja danych zajęć
     static bool updateZajecia(int id,
                               const QString& nazwa,
                               const QString& trener = QString(),
@@ -97,26 +89,60 @@ public:
                               const QString& czas = QString(),
                               int czasTrwania = 60,
                               const QString& opis = QString());
-
-    // Usuwanie zajęć
     static bool deleteZajecia(int id);
-
-    // === Pomocnicze metody dla zajęć ===
-
-    // Wyszukiwanie zajęć po nazwie
     static QList<Zajecia> searchZajeciaByNazwa(const QString& nazwa);
-
-    // Wyszukiwanie zajęć po trenerze
     static QList<Zajecia> searchZajeciaByTrener(const QString& trener);
-
-    // Pobieranie zajęć w konkretnym dniu
     static QList<Zajecia> getZajeciaByData(const QString& data);
-
-    // Liczba wszystkich zajęć
     static int getZajeciaCount();
-
-    // Sprawdzanie czy nazwa zajęć już istnieje (dla tego samego dnia i czasu)
     static bool zajeciaExist(const QString& nazwa, const QString& data, const QString& czas, int excludeId = -1);
+
+    // === CRUD dla REZERWACJI ===
+
+    // Dodawanie nowej rezerwacji
+    static bool addRezerwacja(int idKlienta, int idZajec, const QString& status = "aktywna");
+
+    // Pobieranie wszystkich rezerwacji (z informacjami o klientach i zajęciach)
+    static QList<Rezerwacja> getAllRezerwacje();
+
+    // Pobieranie rezerwacji po ID
+    static Rezerwacja getRezerwacjaById(int id);
+
+    // Aktualizacja statusu rezerwacji
+    static bool updateRezerwacjaStatus(int id, const QString& status);
+
+    // Usuwanie rezerwacji (anulowanie)
+    static bool deleteRezerwacja(int id);
+
+    // === Pomocnicze metody dla rezerwacji ===
+
+    // Sprawdzanie czy klient ma już rezerwację na te zajęcia
+    static bool klientMaRezerwacje(int idKlienta, int idZajec);
+
+    // Pobieranie liczby aktywnych rezerwacji na zajęcia
+    static int getIloscAktywnychRezerwacji(int idZajec);
+
+    // Sprawdzanie czy można dodać rezerwację (czy nie przekroczono limitu)
+    static bool moznaZarezerwowac(int idZajec);
+
+    // Pobieranie rezerwacji konkretnego klienta
+    static QList<Rezerwacja> getRezerwacjeKlienta(int idKlienta);
+
+    // Pobieranie rezerwacji dla konkretnych zajęć
+    static QList<Rezerwacja> getRezerwacjeZajec(int idZajec);
+
+    // Pobieranie zajęć dostępnych do rezerwacji (z wolnymi miejscami)
+    static QList<Zajecia> getZajeciaDostepneDoRezerwacji();
+
+    // Pobieranie liczby wszystkich rezerwacji
+    static int getRezerwacjeCount();
+
+    // === Metody raportowe ===
+
+    // Najpopularniejsze zajęcia (według liczby rezerwacji)
+    static QList<QPair<QString, int>> getNajpopularniejszeZajecia(int limit = 10);
+
+    // Najaktywniejszi klienci (według liczby rezerwacji)
+    static QList<QPair<QString, int>> getNajaktywniejszychKlientow(int limit = 10);
 
 private:
     DatabaseManager() = default;
@@ -125,6 +151,7 @@ private:
     // Pomocnicze metody do konwersji QSqlQuery na struktury
     static Klient queryToKlient(class QSqlQuery& query);
     static Zajecia queryToZajecia(class QSqlQuery& query);
+    static Rezerwacja queryToRezerwacja(class QSqlQuery& query);
 };
 
 #endif // DATABASEMANAGER_H

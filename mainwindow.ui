@@ -729,6 +729,340 @@
         </item>
        </layout>
       </widget>
+
+      <!-- ==================== ZAKŁADKA 3: REZERWACJE ==================== -->
+      <widget class="QWidget" name="tabRezerwacje">
+       <attribute name="title">
+        <string>📅 Rezerwacje</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_rezerwacje">
+        <item>
+         <!-- LEWA STRONA - LISTA REZERWACJI -->
+         <widget class="QWidget" name="leftPanelRezerwacje" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>650</width>
+            <height>0</height>
+           </size>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_leftRezerwacje">
+           <item>
+            <widget class="QLabel" name="labelRezerwacjeTitle">
+             <property name="text">
+              <string>Lista Rezerwacji</string>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>14</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+            </widget>
+           </item>
+
+           <!-- Filtrowanie rezerwacji -->
+           <item>
+            <layout class="QHBoxLayout" name="filterLayoutRezerwacje">
+             <item>
+              <widget class="QComboBox" name="comboBoxFilterStatusRezerwacje">
+               <item>
+                <property name="text">
+                 <string>Wszystkie rezerwacje</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Tylko aktywne</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Tylko anulowane</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButtonFilterRezerwacje">
+               <property name="text">
+                <string>Filtruj</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacerFilterRezerwacje">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+
+           <!-- Tabela z rezerwacjami -->
+           <item>
+            <widget class="QTableWidget" name="tableWidgetRezerwacje">
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectRows</enum>
+             </property>
+             <property name="sortingEnabled">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+
+           <!-- Przyciski akcji rezerwacji -->
+           <item>
+            <layout class="QHBoxLayout" name="buttonsLayoutRezerwacje">
+             <item>
+              <widget class="QPushButton" name="pushButtonOdswiezRezerwacje">
+               <property name="text">
+                <string>Odśwież listę</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButtonAnulujRezerwacje">
+               <property name="text">
+                <string>Anuluj rezerwację</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacerRezerwacje">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelLiczbaRezerwacji">
+               <property name="text">
+                <string>Liczba rezerwacji: 0</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+
+        <item>
+         <!-- PRAWA STRONA - FORMULARZ REZERWACJI -->
+         <widget class="QWidget" name="rightPanelRezerwacje" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>400</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>500</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_rightRezerwacje">
+           <item>
+            <widget class="QLabel" name="labelFormularzRezerwacjiTitle">
+             <property name="text">
+              <string>Nowa Rezerwacja</string>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>14</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+            </widget>
+           </item>
+
+           <!-- Formularz rezerwacji -->
+           <item>
+            <widget class="QGroupBox" name="groupBoxFormularzRezerwacji">
+             <property name="title">
+              <string>Dane rezerwacji</string>
+             </property>
+             <layout class="QFormLayout" name="formLayoutRezerwacji">
+              <item row="0" column="0">
+               <widget class="QLabel" name="labelKlientRezerwacji">
+                <property name="text">
+                 <string>Klient *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="comboBoxKlientRezerwacji">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="labelZajeciaRezerwacji">
+                <property name="text">
+                 <string>Zajęcia *:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="comboBoxZajeciaRezerwacji">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="labelStatusRezerwacji">
+                <property name="text">
+                 <string>Status:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QComboBox" name="comboBoxStatusRezerwacji">
+                <item>
+                 <property name="text">
+                  <string>aktywna</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>anulowana</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+
+           <!-- Informacje o zajęciach -->
+           <item>
+            <widget class="QGroupBox" name="groupBoxInfoZajecia">
+             <property name="title">
+              <string>Informacje o zajęciach</string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayoutInfoZajecia">
+              <item>
+               <widget class="QLabel" name="labelInfoNazwaZajec">
+                <property name="text">
+                 <string>Nazwa: -</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="labelInfoTrener">
+                <property name="text">
+                 <string>Trener: -</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="labelInfoDataCzas">
+                <property name="text">
+                 <string>Termin: -</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="labelInfoMiejsca">
+                <property name="text">
+                 <string>Wolne miejsca: -</string>
+                </property>
+                <property name="font">
+                 <font>
+                  <weight>75</weight>
+                  <bold>true</bold>
+                 </font>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+
+           <!-- Przyciski formularza rezerwacji -->
+           <item>
+            <layout class="QVBoxLayout" name="formButtonsLayoutRezerwacji">
+             <item>
+              <widget class="QPushButton" name="pushButtonDodajRezerwacje">
+               <property name="text">
+                <string>Dodaj rezerwację</string>
+               </property>
+               <property name="default">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="pushButtonWyczyscRezerwacje">
+               <property name="text">
+                <string>Wyczyść formularz</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+
+           <!-- Statystyki -->
+           <item>
+            <widget class="QGroupBox" name="groupBoxStatystyki">
+             <property name="title">
+              <string>Statystyki</string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayoutStatystyki">
+              <item>
+               <widget class="QPushButton" name="pushButtonPokazStatystyki">
+                <property name="text">
+                 <string>Pokaż najpopularniejsze zajęcia</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButtonPokazAktywnych">
+                <property name="text">
+                 <string>Pokaż najaktywniejszych klientów</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+
+           <item>
+            <widget class="QLabel" name="labelWymaganeRezerwacje">
+             <property name="text">
+              <string>* - pola wymagane</string>
+             </property>
+             <property name="font">
+              <font>
+               <italic>true</italic>
+              </font>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="verticalSpacerRezerwacje">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
      </widget>
     </item>
    </layout>

@@ -9,6 +9,8 @@
 #include <QDate>
 #include <QTime>
 #include <QApplication>
+#include <QBrush>
+#include <QColor>
 
 // ==================== KONSTRUKTOR I DESTRUKTOR ====================
 
@@ -17,16 +19,19 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , aktualnieEdytowanyKlientId(-1)
     , aktualnieEdytowaneZajeciaId(-1)
+    , aktualnieWybranaRezerwacjaId(-1)
 {
     ui->setupUi(this);
     setupUI();
     setupConnections();
     setupTableKlienci();
     setupTableZajecia();
+    setupTableRezerwacje();
 
-    // Załaduj dane do obu tabel
+    // Załaduj dane do wszystkich tabel
     odswiezListeKlientow();
     odswiezListeZajec();
+    odswiezListeRezerwacji();
 }
 
 MainWindow::~MainWindow()
@@ -54,6 +59,165 @@ void MainWindow::createTablesIfNotExist() {
     )")) {
         qWarning() << "Błąd tworzenia tabeli 'klient':" << query.lastError().text();
     }
+}
+
+// ==================== SLOTS DLA REZERWACJI ====================
+
+void MainWindow::dodajRezerwacje() {
+    if (!walidujFormularzRezerwacji()) {
+        return;
+    }
+
+    // Pobierz ID klienta i zajęć z ComboBoxów
+    int idKlienta = ui->comboBoxKlientRezerwacji->currentData().toInt();
+    int idZajec = ui->comboBoxZajeciaRezerwacji->currentData().toInt();
+    QString status = ui->comboBoxStatusRezerwacji->currentText();
+
+    if (idKlienta <= 0 || idZajec <= 0) {
+        pokazKomunikat("Błąd", "Wybierz prawidłowego klienta i zajęcia.", QMessageBox::Warning);
+        return;
+    }
+
+    bool sukces = DatabaseManager::addRezerwacja(idKlienta, idZajec, status);
+
+    if (sukces) {
+        pokazKomunikat("Sukces", "Rezerwacja została dodana pomyślnie!", QMessageBox::Information);
+        wyczyscFormularzRezerwacji();
+        odswiezListeRezerwacji();
+        // Odśwież też zajęcia, żeby zaktualizować liczby miejsc
+        zaladujZajeciaDoComboBox();
+        ui->statusbar->showMessage("Dodano nową rezerwację", 3000);
+    } else {
+        pokazKomunikat("Błąd", "Nie udało się dodać rezerwacji.\nSprawdź czy:\n• Klient nie ma już rezerwacji na te zajęcia\n• Nie przekroczono limitu uczestników", QMessageBox::Warning);
+    }
+}
+
+void MainWindow::anulujRezerwacje() {
+    if (aktualnieWybranaRezerwacjaId <= 0) {
+        pokazKomunikat("Błąd", "Nie wybrano rezerwacji do anulowania.", QMessageBox::Warning);
+        return;
+    }
+
+    QMessageBox::StandardButton odpowiedz = QMessageBox::question(
+        this,
+        "Potwierdzenie",
+        "Czy na pewno chcesz anulować wybraną rezerwację?\n\nTa operacja jest nieodwracalna!",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+        );
+
+    if (odpowiedz != QMessageBox::Yes) {
+        return;
+    }
+
+    // Możemy usunąć rezerwację lub zmienić status na "anulowana"
+    // Używam zmiany statusu, żeby zachować historię
+    bool sukces = DatabaseManager::updateRezerwacjaStatus(aktualnieWybranaRezerwacjaId, "anulowana");
+
+    if (sukces) {
+        pokazKomunikat("Sukces", "Rezerwacja została anulowana!", QMessageBox::Information);
+        odswiezListeRezerwacji();
+        zaladujZajeciaDoComboBox(); // Odśwież dostępne miejsca
+        aktualizujPrzyciskAnuluj();
+        ui->statusbar->showMessage("Anulowano rezerwację", 3000);
+    } else {
+        pokazKomunikat("Błąd", "Nie udało się anulować rezerwacji.", QMessageBox::Critical);
+    }
+}
+
+void MainWindow::wyczyscFormularzRezerwacji() {
+    ui->comboBoxKlientRezerwacji->setCurrentIndex(-1);
+    ui->comboBoxZajeciaRezerwacji->setCurrentIndex(-1);
+    ui->comboBoxStatusRezerwacji->setCurrentIndex(0); // "aktywna"
+
+    wyczyscInfoZajec();
+    aktualnieWybranaRezerwacjaId = -1;
+    aktualizujPrzyciskAnuluj();
+}
+
+void MainWindow::filtrujRezerwacje() {
+    QString statusFilter = ui->comboBoxFilterStatusRezerwacje->currentText();
+
+    QList<Rezerwacja> wszystkieRezerwacje = DatabaseManager::getAllRezerwacje();
+    QList<Rezerwacja> przefiltrowane;
+
+    for (const Rezerwacja& r : wszystkieRezerwacje) {
+        if (statusFilter == "Wszystkie rezerwacje" ||
+            (statusFilter == "Tylko aktywne" && r.status == "aktywna") ||
+            (statusFilter == "Tylko anulowane" && r.status == "anulowana")) {
+            przefiltrowane.append(r);
+        }
+    }
+
+    zaladujRezerwacjeDoTabeli(przefiltrowane);
+    ui->statusbar->showMessage(QString("Przefiltrowano do %1 rezerwacji").arg(przefiltrowane.size()), 3000);
+}
+
+void MainWindow::odswiezListeRezerwacji() {
+    QList<Rezerwacja> rezerwacje = DatabaseManager::getAllRezerwacje();
+    zaladujRezerwacjeDoTabeli(rezerwacje);
+    aktualizujLicznikRezerwacji();
+    zaladujKlientowDoComboBox();
+    zaladujZajeciaDoComboBox();
+    ui->statusbar->showMessage("Lista rezerwacji odświeżona", 2000);
+}
+
+void MainWindow::rezerwacjaWybrana() {
+    int aktualnyWiersz = ui->tableWidgetRezerwacje->currentRow();
+
+    if (aktualnyWiersz < 0) {
+        aktualnieWybranaRezerwacjaId = -1;
+        aktualizujPrzyciskAnuluj();
+        return;
+    }
+
+    QTableWidgetItem* idItem = ui->tableWidgetRezerwacje->item(aktualnyWiersz, 0);
+    if (!idItem) {
+        return;
+    }
+
+    aktualnieWybranaRezerwacjaId = idItem->text().toInt();
+    aktualizujPrzyciskAnuluj();
+}
+
+void MainWindow::zajeciaRezerwacjiWybrane() {
+    aktualizujInfoZajec();
+}
+
+void MainWindow::pokazStatystyki() {
+    QList<QPair<QString, int>> popularne = DatabaseManager::getNajpopularniejszeZajecia(5);
+
+    QString tekst = "🏆 Najpopularniejsze zajęcia:\n\n";
+    if (popularne.isEmpty()) {
+        tekst += "Brak danych do wyświetlenia.";
+    } else {
+        for (int i = 0; i < popularne.size(); i++) {
+            tekst += QString("%1. %2 - %3 rezerwacji\n")
+            .arg(i + 1)
+                .arg(popularne[i].first)
+                .arg(popularne[i].second);
+        }
+    }
+
+    pokazKomunikat("Statystyki zajęć", tekst, QMessageBox::Information);
+}
+
+void MainWindow::pokazAktywnychKlientow() {
+    QList<QPair<QString, int>> aktywni = DatabaseManager::getNajaktywniejszychKlientow(5);
+
+    QString tekst = "🥇 Najaktywniejszi klienci:\n\n";
+    if (aktywni.isEmpty()) {
+        tekst += "Brak danych do wyświetlenia.";
+    } else {
+        for (int i = 0; i < aktywni.size(); i++) {
+            tekst += QString("%1. %2 - %3 rezerwacji\n")
+            .arg(i + 1)
+                .arg(aktywni[i].first)
+                .arg(aktywni[i].second);
+        }
+    }
+
+    pokazKomunikat("Najaktywniejszi klienci", tekst, QMessageBox::Information);
 
     // 2) Tabela zajęć
     if (!query.exec(R"(
@@ -102,6 +266,7 @@ void MainWindow::createTablesIfNotExist() {
         qWarning() << "Błąd tworzenia tabeli 'rezerwacja':" << query.lastError().text();
     }
 }
+}
 
 // ==================== SETUP METODY ====================
 
@@ -114,9 +279,14 @@ void MainWindow::setupUI() {
     // Ustaw domyślny czas
     ui->timeEditZajecia->setTime(QTime(9, 0)); // 09:00
 
+    // Ustaw domyślne wartości dla rezerwacji
+    ui->comboBoxStatusRezerwacji->setCurrentIndex(0); // "aktywna"
+    wyczyscInfoZajec();
+
     // Ustaw tryby dodawania na starcie
     ustawTrybDodawaniaKlienta();
     ustawTrybDodawaniaZajec();
+    aktualnieWybranaRezerwacjaId = -1;
 
     // Ustaw status bar
     ui->statusbar->showMessage("Gotowy");
@@ -156,6 +326,21 @@ void MainWindow::setupConnections() {
 
     // === TABELA ZAJĘĆ ===
     connect(ui->tableWidgetZajecia, &QTableWidget::itemSelectionChanged, this, &MainWindow::zajeciaWybrane);
+
+    // === PRZYCISKI REZERWACJI ===
+    connect(ui->pushButtonDodajRezerwacje, &QPushButton::clicked, this, &MainWindow::dodajRezerwacje);
+    connect(ui->pushButtonAnulujRezerwacje, &QPushButton::clicked, this, &MainWindow::anulujRezerwacje);
+    connect(ui->pushButtonWyczyscRezerwacje, &QPushButton::clicked, this, &MainWindow::wyczyscFormularzRezerwacji);
+    connect(ui->pushButtonOdswiezRezerwacje, &QPushButton::clicked, this, &MainWindow::odswiezListeRezerwacji);
+    connect(ui->pushButtonFilterRezerwacje, &QPushButton::clicked, this, &MainWindow::filtrujRezerwacje);
+    connect(ui->pushButtonPokazStatystyki, &QPushButton::clicked, this, &MainWindow::pokazStatystyki);
+    connect(ui->pushButtonPokazAktywnych, &QPushButton::clicked, this, &MainWindow::pokazAktywnychKlientow);
+
+    // === COMBOBOX REZERWACJI ===
+    connect(ui->comboBoxZajeciaRezerwacji, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::zajeciaRezerwacjiWybrane);
+
+    // === TABELA REZERWACJI ===
+    connect(ui->tableWidgetRezerwacje, &QTableWidget::itemSelectionChanged, this, &MainWindow::rezerwacjaWybrana);
 
     // === MENU ===
     connect(ui->actionZamknij, &QAction::triggered, this, &MainWindow::zamknijAplikacje);
@@ -209,6 +394,31 @@ void MainWindow::setupTableZajecia() {
     header->resizeSection(4, 80);  // Godzina
     header->resizeSection(5, 90);  // Czas trwania
     header->resizeSection(6, 60);  // Limit
+}
+
+void MainWindow::setupTableRezerwacje() {
+    // Konfiguracja tabeli rezerwacji
+    ui->tableWidgetRezerwacje->setColumnCount(8);
+
+    QStringList headers = {"ID", "Klient", "Zajęcia", "Trener", "Data zajęć", "Godzina", "Data rezerwacji", "Status"};
+    ui->tableWidgetRezerwacje->setHorizontalHeaderLabels(headers);
+
+    // Ukryj kolumnę ID
+    ui->tableWidgetRezerwacje->setColumnHidden(0, true);
+
+    // Ustaw tryb zaznaczania całych wierszy
+    ui->tableWidgetRezerwacje->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableWidgetRezerwacje->setSelectionMode(QAbstractItemView::SingleSelection);
+
+    // Ustaw szerokości kolumn
+    QHeaderView* header = ui->tableWidgetRezerwacje->horizontalHeader();
+    header->setStretchLastSection(true);
+    header->resizeSection(1, 150); // Klient
+    header->resizeSection(2, 120); // Zajęcia
+    header->resizeSection(3, 140); // Trener
+    header->resizeSection(4, 100); // Data zajęć
+    header->resizeSection(5, 80);  // Godzina
+    header->resizeSection(6, 140); // Data rezerwacji
 }
 
 // ==================== SLOTS DLA KLIENTÓW ====================
@@ -547,13 +757,21 @@ void MainWindow::zamknijAplikacje() {
 
 void MainWindow::oProgramie() {
     QMessageBox::about(this, "O programie",
-                       "Zarządzanie Siłownią v2.0\n\n"
-                       "System do zarządzania klientami, zajęciami i karnetami siłowni.\n\n"
+                       "Zarządzanie Siłownią v3.0\n\n"
+                       "Kompletny system do zarządzania siłownią z pełną obsługą rezerwacji.\n\n"
                        "Funkcje:\n"
-                       "• Zarządzanie klientami\n"
+                       "• Zarządzanie klientami (dodawanie, edycja, usuwanie)\n"
                        "• Zarządzanie zajęciami grupowymi\n"
-                       "• Wyszukiwanie i filtrowanie\n"
-                       "• Dodawanie, edycja i usuwanie danych\n\n"
+                       "• System rezerwacji z kontrolą limitów uczestników\n"
+                       "• Automatyczne sprawdzanie dostępności miejsc\n"
+                       "• Wyszukiwanie i filtrowanie danych\n"
+                       "• Statystyki najpopularniejszych zajęć\n"
+                       "• Raporty najaktywniejszych klientów\n\n"
+                       "Nowe w v3.0:\n"
+                       "• Pełny system rezerwacji\n"
+                       "• Kontrola limitów uczestników\n"
+                       "• Kolorowe statusy rezerwacji\n"
+                       "• Statystyki i raporty\n\n"
                        "Technologia: Qt + SQLite"
                        );
 }
@@ -746,6 +964,167 @@ void MainWindow::ustawTrybEdycjiZajec() {
 void MainWindow::aktualizujLicznikZajec() {
     int liczba = DatabaseManager::getZajeciaCount();
     ui->labelLiczbaZajec->setText(QString("Liczba zajęć: %1").arg(liczba));
+}
+
+// ==================== METODY POMOCNICZE - REZERWACJE ====================
+
+void MainWindow::zaladujRezerwacjeDoTabeli(const QList<Rezerwacja>& rezerwacje) {
+    ui->tableWidgetRezerwacje->setRowCount(rezerwacje.size());
+
+    for (int i = 0; i < rezerwacje.size(); ++i) {
+        const Rezerwacja& r = rezerwacje[i];
+
+        ui->tableWidgetRezerwacje->setItem(i, 0, new QTableWidgetItem(QString::number(r.id)));
+        ui->tableWidgetRezerwacje->setItem(i, 1, new QTableWidgetItem(QString("%1 %2").arg(r.imieKlienta).arg(r.nazwiskoKlienta)));
+        ui->tableWidgetRezerwacje->setItem(i, 2, new QTableWidgetItem(r.nazwaZajec));
+        ui->tableWidgetRezerwacje->setItem(i, 3, new QTableWidgetItem(r.trenerZajec));
+        ui->tableWidgetRezerwacje->setItem(i, 4, new QTableWidgetItem(r.dataZajec));
+        ui->tableWidgetRezerwacje->setItem(i, 5, new QTableWidgetItem(r.czasZajec));
+
+        // Formatuj datę rezerwacji (pokaż tylko datę, bez godziny)
+        QString dataRezerwacji = r.dataRezerwacji;
+        if (dataRezerwacji.length() > 10) {
+            dataRezerwacji = dataRezerwacji.left(10); // Tylko YYYY-MM-DD
+        }
+        ui->tableWidgetRezerwacje->setItem(i, 6, new QTableWidgetItem(dataRezerwacji));
+
+        // Status z kolorowym tłem
+        QTableWidgetItem* statusItem = new QTableWidgetItem(r.status);
+        if (r.status == "aktywna") {
+            statusItem->setBackground(QBrush(QColor(144, 238, 144))); // Jasny zielony
+        } else if (r.status == "anulowana") {
+            statusItem->setBackground(QBrush(QColor(255, 182, 193))); // Jasny czerwony
+        }
+        ui->tableWidgetRezerwacje->setItem(i, 7, statusItem);
+    }
+}
+
+void MainWindow::zaladujKlientowDoComboBox() {
+    ui->comboBoxKlientRezerwacji->clear();
+
+    QList<Klient> klienci = DatabaseManager::getAllKlienci();
+    for (const Klient& k : klienci) {
+        QString tekst = QString("%1 %2").arg(k.imie).arg(k.nazwisko);
+        if (!k.email.isEmpty()) {
+            tekst += QString(" (%1)").arg(k.email);
+        }
+        ui->comboBoxKlientRezerwacji->addItem(tekst, k.id);
+    }
+
+    ui->comboBoxKlientRezerwacji->setCurrentIndex(-1); // Nic nie wybrane
+}
+
+void MainWindow::zaladujZajeciaDoComboBox() {
+    ui->comboBoxZajeciaRezerwacji->clear();
+
+    QList<Zajecia> dostepneZajecia = DatabaseManager::getZajeciaDostepneDoRezerwacji();
+    for (const Zajecia& z : dostepneZajecia) {
+        int aktualne = DatabaseManager::getIloscAktywnychRezerwacji(z.id);
+
+        QString tekst = QString("%1 - %2 %3 (%4/%5 miejsc)")
+                            .arg(z.nazwa)
+                            .arg(z.data)
+                            .arg(z.czas)
+                            .arg(aktualne)
+                            .arg(z.maksUczestnikow);
+
+        if (!z.trener.isEmpty()) {
+            tekst += QString(" [%1]").arg(z.trener);
+        }
+
+        ui->comboBoxZajeciaRezerwacji->addItem(tekst, z.id);
+    }
+
+    ui->comboBoxZajeciaRezerwacji->setCurrentIndex(-1); // Nic nie wybrane
+}
+
+void MainWindow::aktualizujInfoZajec() {
+    int zajeciaId = ui->comboBoxZajeciaRezerwacji->currentData().toInt();
+
+    if (zajeciaId <= 0) {
+        wyczyscInfoZajec();
+        return;
+    }
+
+    Zajecia zajecia = DatabaseManager::getZajeciaById(zajeciaId);
+    if (zajecia.id <= 0) {
+        wyczyscInfoZajec();
+        return;
+    }
+
+    int aktualne = DatabaseManager::getIloscAktywnychRezerwacji(zajeciaId);
+    int wolne = zajecia.maksUczestnikow - aktualne;
+
+    ui->labelInfoNazwaZajec->setText(QString("Nazwa: %1").arg(zajecia.nazwa));
+    ui->labelInfoTrener->setText(QString("Trener: %1").arg(zajecia.trener.isEmpty() ? "Brak" : zajecia.trener));
+    ui->labelInfoDataCzas->setText(QString("Termin: %1 %2 (%3 min)")
+                                       .arg(zajecia.data)
+                                       .arg(zajecia.czas)
+                                       .arg(zajecia.czasTrwania));
+
+    QString tekstMiejsca = QString("Wolne miejsca: %1/%2").arg(wolne).arg(zajecia.maksUczestnikow);
+    ui->labelInfoMiejsca->setText(tekstMiejsca);
+
+    // Zmień kolor w zależności od dostępności
+    if (wolne <= 0) {
+        ui->labelInfoMiejsca->setStyleSheet("color: red; font-weight: bold;");
+    } else if (wolne <= 3) {
+        ui->labelInfoMiejsca->setStyleSheet("color: orange; font-weight: bold;");
+    } else {
+        ui->labelInfoMiejsca->setStyleSheet("color: green; font-weight: bold;");
+    }
+}
+
+void MainWindow::wyczyscInfoZajec() {
+    ui->labelInfoNazwaZajec->setText("Nazwa: -");
+    ui->labelInfoTrener->setText("Trener: -");
+    ui->labelInfoDataCzas->setText("Termin: -");
+    ui->labelInfoMiejsca->setText("Wolne miejsca: -");
+    ui->labelInfoMiejsca->setStyleSheet(""); // Usuń kolorowanie
+}
+
+bool MainWindow::walidujFormularzRezerwacji() {
+    QString bledy = "";
+
+    if (ui->comboBoxKlientRezerwacji->currentIndex() < 0) {
+        bledy += "• Wybierz klienta\n";
+    }
+
+    if (ui->comboBoxZajeciaRezerwacji->currentIndex() < 0) {
+        bledy += "• Wybierz zajęcia\n";
+    }
+
+    if (!bledy.isEmpty()) {
+        pokazKomunikat("Błąd walidacji", "Formularz zawiera błędy:\n\n" + bledy, QMessageBox::Warning);
+        return false;
+    }
+
+    return true;
+}
+
+void MainWindow::aktualizujLicznikRezerwacji() {
+    int liczba = DatabaseManager::getRezerwacjeCount();
+    ui->labelLiczbaRezerwacji->setText(QString("Liczba rezerwacji: %1").arg(liczba));
+}
+
+void MainWindow::aktualizujPrzyciskAnuluj() {
+    bool czyWybrane = (aktualnieWybranaRezerwacjaId > 0);
+    ui->pushButtonAnulujRezerwacje->setEnabled(czyWybrane);
+
+    if (czyWybrane) {
+        // Sprawdź status wybranej rezerwacji
+        Rezerwacja r = DatabaseManager::getRezerwacjaById(aktualnieWybranaRezerwacjaId);
+        if (r.status == "anulowana") {
+            ui->pushButtonAnulujRezerwacje->setText("Już anulowana");
+            ui->pushButtonAnulujRezerwacje->setEnabled(false);
+        } else {
+            ui->pushButtonAnulujRezerwacje->setText("Anuluj rezerwację");
+            ui->pushButtonAnulujRezerwacje->setEnabled(true);
+        }
+    } else {
+        ui->pushButtonAnulujRezerwacje->setText("Anuluj rezerwację");
+    }
+}
 }
 
 // ==================== METODY OGÓLNE ====================

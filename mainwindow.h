@@ -53,6 +53,17 @@ private slots:
     void filtrujZajeciaPoData();
     void zajeciaWybrane();  // gdy klikniemy na wiersz w tabeli zajęć
 
+    // === Slots dla zarządzania REZERWACJAMI ===
+    void odswiezListeRezerwacji();
+    void dodajRezerwacje();
+    void anulujRezerwacje();
+    void wyczyscFormularzRezerwacji();
+    void filtrujRezerwacje();
+    void rezerwacjaWybrana();  // gdy klikniemy na wiersz w tabeli rezerwacji
+    void zajeciaRezerwacjiWybrane();  // gdy wybierzemy zajęcia w comboBox
+    void pokazStatystyki();
+    void pokazAktywnychKlientow();
+
     // === Slots dla menu ===
     void zamknijAplikacje();
     void oProgramie();
@@ -65,6 +76,9 @@ private:
 
     // === Zmienne pomocnicze dla ZAJĘĆ ===
     int aktualnieEdytowaneZajeciaId; // -1 gdy dodajemy nowe, >0 gdy edytujemy
+
+    // === Zmienne pomocnicze dla REZERWACJI ===
+    int aktualnieWybranaRezerwacjaId; // -1 gdy nic nie wybrane, >0 gdy wybrane
 
     // === Metody pomocnicze - OGÓLNE ===
     void setupUI();                    // Konfiguracja UI po uruchomieniu
@@ -89,6 +103,17 @@ private:
     void ustawTrybDodawaniaZajec();                              // Ustaw UI w tryb dodawania nowych zajęć
     void ustawTrybEdycjiZajec();                                 // Ustaw UI w tryb edycji zajęć
     void aktualizujLicznikZajec();                               // Aktualizuj wyświetlaną liczbę zajęć
+
+    // === Metody pomocnicze - REZERWACJE ===
+    void setupTableRezerwacje();                                           // Konfiguracja tabeli rezerwacji
+    void zaladujRezerwacjeDoTabeli(const QList<Rezerwacja>& rezerwacje);   // Załaduj rezerwacje do tabeli
+    void zaladujKlientowDoComboBox();                                      // Załaduj klientów do ComboBox
+    void zaladujZajeciaDoComboBox();                                       // Załaduj dostępne zajęcia do ComboBox
+    void aktualizujInfoZajec();                                            // Aktualizuj informacje o wybranych zajęciach
+    bool walidujFormularzRezerwacji();                                     // Sprawdź czy formularz rezerwacji jest poprawny
+    void wyczyscInfoZajec();                                               // Wyczyść informacje o zajęciach
+    void aktualizujLicznikRezerwacji();                                    // Aktualizuj wyświetlaną liczbę rezerwacji
+    void aktualizujPrzyciskAnuluj();                                       // Aktualizuj przycisk anulowania
 
     // === Metody ogólne ===
     void pokazKomunikat(const QString& tytul, const QString& tresc, QMessageBox::Icon typ = QMessageBox::Information);
