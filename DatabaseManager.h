@@ -128,22 +128,14 @@ public:
     static int getRezerwacjeCount();
 
     // === CRUD dla KARNETÓW ===
-
-    // Dodawanie nowego karnetu
     static bool addKarnet(int idKlienta,
                           const QString& typ,
                           const QString& dataRozpoczecia,
                           const QString& dataZakonczenia,
                           double cena,
                           bool czyAktywny = true);
-
-    // Pobieranie wszystkich karnetów (z informacjami o klientach)
     static QList<Karnet> getAllKarnety();
-
-    // Pobieranie karnetu po ID
     static Karnet getKarnetById(int id);
-
-    // Aktualizacja karnetu
     static bool updateKarnet(int id,
                              int idKlienta,
                              const QString& typ,
@@ -151,44 +143,39 @@ public:
                              const QString& dataZakonczenia,
                              double cena,
                              bool czyAktywny);
-
-    // Usuwanie karnetu
     static bool deleteKarnet(int id);
 
     // === Pomocnicze metody dla karnetów ===
-
-    // Pobieranie karnetów konkretnego klienta
     static QList<Karnet> getKarnetyKlienta(int idKlienta);
-
-    // Pobieranie aktywnych karnetów klienta
     static QList<Karnet> getAktywneKarnetyKlienta(int idKlienta);
-
-    // Sprawdzanie czy klient ma aktywny karnet
     static bool klientMaAktywnyKarnet(int idKlienta);
-
-    // Filtrowanie karnetów po typie
     static QList<Karnet> getKarnetyByTyp(const QString& typ);
-
-    // Filtrowanie karnetów po statusie (aktywne/nieaktywne)
     static QList<Karnet> getKarnetyByStatus(bool czyAktywny);
-
-    // Pobieranie karnetów wygasających w określonym terminie
     static QList<Karnet> getKarnetyWygasajace(const QString& dataOd, const QString& dataDo);
-
-    // Pobieranie liczby wszystkich karnetów
     static int getKarnetyCount();
-
-    // Sprawdzanie czy można dodać karnet (czy klient nie ma już aktywnego karnetu tego typu)
     static bool moznaUtworzycKarnet(int idKlienta, const QString& typ);
 
     // === Metody raportowe ===
     static QList<QPair<QString, int>> getNajpopularniejszeZajecia(int limit = 10);
     static QList<QPair<QString, int>> getNajaktywniejszychKlientow(int limit = 10);
-
-    // Statystyki karnetów
-    static QList<QPair<QString, int>> getStatystykiKarnetow(); // [typ, liczba]
+    static QList<QPair<QString, int>> getStatystykiKarnetow();
     static double getCalkowitePrzychodyZKarnetow();
     static int getLiczbaAktywnychKarnetow();
+
+    // === EKSPORT I IMPORT CSV ===
+
+    // Eksport do CSV
+    static bool exportKlienciToCSV(const QString& filePath);
+    static bool exportZajeciaToCSV(const QString& filePath);
+    static bool exportRezerwacjeToCSV(const QString& filePath);
+    static bool exportKarnetyToCSV(const QString& filePath);
+    static bool exportAllToCSV(const QString& dirPath);  // Eksportuje wszystkie tabele do oddzielnych plików
+
+    // Import z CSV
+    static QPair<int, QStringList> importKlienciFromCSV(const QString& filePath);  // Zwraca liczbę zaimportowanych i listę błędów
+    static QPair<int, QStringList> importZajeciaFromCSV(const QString& filePath);
+    static QPair<int, QStringList> importRezerwacjeFromCSV(const QString& filePath);
+    static QPair<int, QStringList> importKarnetyFromCSV(const QString& filePath);
 
 private:
     DatabaseManager() = default;
@@ -199,6 +186,18 @@ private:
     static Zajecia queryToZajecia(class QSqlQuery& query);
     static Rezerwacja queryToRezerwacja(class QSqlQuery& query);
     static Karnet queryToKarnet(class QSqlQuery& query);
+
+    // Pomocnicze metody dla CSV
+    static QString escapeCSVField(const QString& field);
+    static QStringList parseCSVLine(const QString& line);
+    static QString formatCSVHeader(const QStringList& headers);
+    static QString formatCSVRow(const QStringList& values);
+
+    // Walidacja danych CSV
+    static bool validateKlientCSVRow(const QStringList& row, QString& errorMsg);
+    static bool validateZajeciaCSVRow(const QStringList& row, QString& errorMsg);
+    static bool validateRezerwacjaCSVRow(const QStringList& row, QString& errorMsg);
+    static bool validateKarnetCSVRow(const QStringList& row, QString& errorMsg);
 };
 
 #endif // DATABASEMANAGER_H

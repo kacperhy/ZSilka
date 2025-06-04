@@ -15,6 +15,8 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QTabWidget>
+#include <QFileDialog>
+#include <QProgressDialog>
 #include "DatabaseManager.h"
 
 QT_BEGIN_NAMESPACE
@@ -76,6 +78,18 @@ private slots:
     void klientKarnetuWybrany();  // gdy wybierzemy klienta w comboBox
     void pokazStatystykiKarnetow();
     void pokazWygasajaceKarnety();
+
+    // === Slots dla IMPORTU/EKSPORTU CSV ===
+    void eksportKlienciCSV();
+    void eksportZajeciaCSV();
+    void eksportRezerwacjeCSV();
+    void eksportKarnetyCSV();
+    void eksportWszystkieCSV();
+
+    void importKlienciCSV();
+    void importZajeciaCSV();
+    void importRezerwacjeCSV();
+    void importKarnetyCSV();
 
     // === Slots dla menu ===
     void zamknijAplikacje();
@@ -144,6 +158,12 @@ private:
     void aktualizujInfoKlienta();                                       // Aktualizuj informacje o wybranym kliencie
     void wyczyscInfoKlienta();                                          // Wyczyść informacje o kliencie
     void obliczCeneKarnetu();                                           // Oblicz cenę karnetu na podstawie typu
+
+    // === Metody pomocnicze - CSV ===
+    QString getCSVSaveFileName(const QString& defaultName, const QString& title = "Eksportuj do CSV");
+    QString getCSVOpenFileName(const QString& title = "Importuj z CSV");
+    QString getDirectoryPath(const QString& title = "Wybierz katalog do eksportu");
+    void pokazRaportImportu(const QString& tytul, int zaimportowane, const QStringList& bledy);
 
     // === Metody ogólne ===
     void pokazKomunikat(const QString& tytul, const QString& tresc, QMessageBox::Icon typ = QMessageBox::Information);
